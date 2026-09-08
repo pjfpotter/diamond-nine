@@ -1,0 +1,14 @@
+{
+  "name": "diamond-nine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Diamond nine card sort tool for online tutoring sessions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.21.0"
+  }
+}

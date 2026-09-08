@@ -1,0 +1,5 @@
+node_modules/
+diamond9.db
+diamond9.db-shm
+diamond9.db-wal
+*.log
