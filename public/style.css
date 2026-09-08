@@ -1,11 +1,13 @@
 :root {
   color-scheme: light;
-  --bg: #fdfaf3;
-  --ink: #1f2933;
+  --bg: #faf6ec;
+  --ink: #22303f;
+  --muted-ink: #5b6b7a;
   --card-bg: #ffffff;
-  --card-border: #1f2933;
-  --slot-border: #b7ac93;
+  --card-border: #22303f;
+  --slot-line: #c9bfa4;
   --accent: #1c4e80;
+  --accent-hover: #163f68;
   --accent-ink: #ffffff;
   --focus-ring: #d1495b;
 }
@@ -21,15 +23,16 @@ html, body {
 body {
   margin: 0;
   font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  font-size: 16px;
   background: var(--bg);
   color: var(--ink);
-  line-height: 1.3;
+  line-height: 1.4;
   display: flex;
   flex-direction: column;
   height: 100dvh;
   overflow: hidden;
-  padding: 0.5rem 0.75rem;
-  gap: 0.4rem;
+  padding: 1rem 1.25rem;
+  gap: 0.75rem;
 }
 
 .page-header {
@@ -38,14 +41,17 @@ body {
 }
 
 .page-header h1 {
-  margin: 0 0 0.15rem;
-  font-size: 1.25rem;
+  margin: 0 0 0.2rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .instructions {
   margin: 0 auto;
-  max-width: 48rem;
-  font-size: 0.85rem;
+  max-width: 42rem;
+  font-size: 0.95rem;
+  color: var(--muted-ink);
 }
 
 main {
@@ -53,34 +59,42 @@ main {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.75rem;
 }
 
 .board {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
-  gap: 0.6rem;
+  gap: 1.25rem;
+  align-items: stretch;
 }
 
 .pool {
-  flex: 0 0 12rem;
+  flex: 0 0 13rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.5rem;
-  border: 2px dashed var(--slot-border);
-  border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.02);
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1.5px solid var(--slot-line);
+  border-radius: 0.75rem;
+  background: #ffffff;
   overflow-y: auto;
 }
 
-.diamond {
+.diamond-area {
   flex: 1 1 auto;
   min-width: 0;
-  width: 100%;
-  max-width: 44rem;
-  margin: 0 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diamond {
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
   position: relative;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -89,14 +103,15 @@ main {
 }
 
 .slot {
-  border: 2px dashed var(--slot-border);
-  margin: -1px;
+  border: 1.5px solid var(--slot-line);
+  margin: -0.75px;
   display: flex;
   align-items: stretch;
   justify-content: stretch;
   position: relative;
   min-height: 0;
   min-width: 0;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .slot[data-row="1"] { grid-column: 3; grid-row: 1; }
@@ -115,9 +130,9 @@ main {
 .card {
   background: var(--card-bg);
   border: 2px solid var(--card-border);
-  border-radius: 0.25rem;
-  padding: 0.4rem 0.5rem;
-  font-size: clamp(0.65rem, 1.6vh, 0.85rem);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.95rem;
   width: 100%;
   flex: 1;
   display: flex;
@@ -127,14 +142,18 @@ main {
   cursor: grab;
   touch-action: none;
   user-select: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  transition: box-shadow 0.15s ease, transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(34, 48, 63, 0.12);
+  transition: box-shadow 0.15s ease, transform 0.2s ease, border-color 0.15s ease;
   overflow: hidden;
 }
 
 .pool .card {
-  flex: 1 1 0;
-  min-height: 2.6rem;
+  flex: 0 0 auto;
+  min-height: 4.4rem;
+}
+
+.card:hover {
+  border-color: var(--accent);
 }
 
 .card:focus-visible {
@@ -143,9 +162,9 @@ main {
 }
 
 .card.dragging {
-  opacity: 0.85;
+  opacity: 0.9;
   cursor: grabbing;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 20px rgba(34, 48, 63, 0.25);
   z-index: 10;
   transition: none;
 }
@@ -153,7 +172,7 @@ main {
 .slot.drop-target,
 .pool.drop-target {
   border-color: var(--accent);
-  background: rgba(28, 78, 128, 0.08);
+  background: rgba(28, 78, 128, 0.1);
 }
 
 .actions {
@@ -162,17 +181,24 @@ main {
 }
 
 button {
-  font-size: 0.95rem;
-  padding: 0.4rem 1.4rem;
-  border-radius: 0.4rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.55rem 1.75rem;
+  border-radius: 0.5rem;
   border: 2px solid var(--accent);
   background: var(--accent);
   color: var(--accent-ink);
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -182,30 +208,29 @@ button:focus-visible {
 }
 
 .hint {
-  margin: 0.15rem 0 0;
-  font-size: 0.75rem;
-  color: #52606d;
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted-ink);
 }
 
 @media (max-width: 640px) {
   .board {
     flex-direction: column;
+    gap: 0.6rem;
   }
   .pool {
     flex: 0 0 auto;
     flex-direction: row;
     flex-wrap: nowrap;
-    height: 22vh;
+    height: 8.5rem;
     overflow-x: auto;
     overflow-y: hidden;
   }
   .pool .card {
     flex: 0 0 auto;
-    width: 5.5rem;
-    height: 100%;
+    width: 9.5rem;
     min-height: 0;
-  }
-  .card {
-    font-size: 0.75rem;
+    height: 100%;
+    font-size: 0.8rem;
   }
 }
