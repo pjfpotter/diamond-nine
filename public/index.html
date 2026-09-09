@@ -10,27 +10,26 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="page-header">
-    <h1 id="set-title">Diamond Nine</h1>
-    <p id="set-instructions" class="instructions">
-      Drag each card into the diamond below. The card you agree with most goes at the top,
-      the one you agree with least at the bottom. Rearrange freely until you're happy, then submit.
-    </p>
-  </header>
-
-  <main>
-    <div class="board" id="board">
-      <div class="pool" id="pool" aria-label="Unplaced cards"></div>
-      <div class="diamond-area">
-        <div class="diamond" id="diamond"></div>
+  <div class="layout">
+    <aside class="info-panel">
+      <h1 id="set-title">Diamond Nine</h1>
+      <p id="set-instructions" class="instructions">
+        Drag each card into the diamond. The card you agree with most goes at the top,
+        the one you agree with least at the bottom. Rearrange freely until you're happy, then submit.
+        Hover or focus a placed card to read it in full.
+      </p>
+      <div class="actions">
+        <button id="submit-btn" type="button" disabled>Submit</button>
+        <p id="submit-hint" class="hint">Place all 9 cards to enable submitting.</p>
       </div>
-    </div>
+    </aside>
 
-    <div class="actions">
-      <button id="submit-btn" type="button" disabled>Submit</button>
-      <p id="submit-hint" class="hint">Place all 9 cards to enable submitting.</p>
+    <div class="pool" id="pool" aria-label="Unplaced cards"></div>
+
+    <div class="diamond-area">
+      <div class="diamond" id="diamond"></div>
     </div>
-  </main>
+  </div>
 
   <script src="app.js"></script>
 </body>
