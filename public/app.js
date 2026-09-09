@@ -28,6 +28,11 @@
   const submitHint = document.getElementById('submit-hint');
   const titleEl = document.getElementById('set-title');
   const instructionsEl = document.getElementById('set-instructions');
+  const liveRegionEl = document.getElementById('live-region');
+  const confirmModal = document.getElementById('confirm-modal');
+  const confirmList = document.getElementById('confirm-list');
+  const confirmBack = document.getElementById('confirm-back');
+  const confirmSend = document.getElementById('confirm-send');
 
   let cards = DEMO_CARDS;
   let setId = new URLSearchParams(location.search).get('set');
@@ -36,6 +41,12 @@
   let slotAssignment = new Array(9).fill(null);
   // ids of cards still sitting in the pool
   let pool = [];
+
+  // The card currently "picked up" via click/tap/keyboard (not mouse-dragged).
+  // Choosing any other card or an empty slot places it there.
+  let pickedUpCardId = null;
+  // After a keyboard/tap-triggered move, render() should refocus this card.
+  let pendingFocusCardId = null;
 
   function initState() {
     slotAssignment = new Array(9).fill(null);
@@ -46,6 +57,13 @@
     return cards.find((c) => c.id === id);
   }
 
+  function announce(message) {
+    liveRegionEl.textContent = '';
+    requestAnimationFrame(() => {
+      liveRegionEl.textContent = message;
+    });
+  }
+
   function buildSlots() {
     diamondEl.innerHTML = '';
     SLOT_LAYOUT.forEach((pos, i) => {
@@ -54,8 +72,8 @@
       slot.dataset.slotIndex = String(i);
       slot.dataset.row = String(pos.row);
       slot.dataset.col = String(pos.col);
-      slot.setAttribute('role', 'group');
-      slot.setAttribute('aria-label', `Diamond position ${i + 1} of 9`);
+      slot.setAttribute('role', 'button');
+      slot.setAttribute('aria-label', `Empty position ${i + 1} of 9`);
       diamondEl.appendChild(slot);
     });
   }
@@ -68,6 +86,7 @@
     el.textContent = card.text;
     el.setAttribute('role', 'button');
     el.setAttribute('aria-label', card.text);
+    if (card.id === pickedUpCardId) el.classList.add('picked-up');
     return el;
   }
 
@@ -88,8 +107,13 @@
     poolEl.classList.remove('drop-target');
 
     slotAssignment.forEach((cardId, i) => {
-      if (!cardId) return;
       const slot = diamondEl.querySelector(`[data-slot-index="${i}"]`);
+      if (!cardId) {
+        slot.tabIndex = 0;
+        slot.setAttribute('aria-label', `Empty position ${i + 1} of 9`);
+        return;
+      }
+      slot.tabIndex = -1;
       slot.appendChild(makeCardEl(cardById(cardId)));
     });
 
@@ -115,14 +139,21 @@
 
     updateSubmitState();
     attachDragHandlers();
+
+    if (pendingFocusCardId) {
+      const el = document.querySelector(`.card[data-card-id="${pendingFocusCardId}"]`);
+      if (el) el.focus();
+      pendingFocusCardId = null;
+    }
   }
 
   function updateSubmitState() {
-    const allPlaced = slotAssignment.every((v) => v !== null);
+    const placed = 9 - pool.length;
+    const allPlaced = placed === 9;
     submitBtn.disabled = !allPlaced;
     submitHint.textContent = allPlaced
-      ? 'Ready to submit.'
-      : `Place all 9 cards to enable submitting (${pool.length} remaining).`;
+      ? 'All 9 placed — ready to submit.'
+      : `${placed} of 9 placed.`;
   }
 
   function slotIndexOf(cardId) {
@@ -162,8 +193,110 @@
     render();
   }
 
-  // --- Pointer-based drag (works for mouse and touch) ---
+  // --- Pick up / place: shared by click, tap, and keyboard ---
+  //
+  // This is the accessible alternative to dragging: activate a card to pick
+  // it up, then activate any other card (to swap) or empty slot to place it.
+  // Activating the picked-up card again cancels the pickup.
 
+  function setPicking(on) {
+    document.body.classList.toggle('picking', on);
+  }
+
+  function releasePickup(message) {
+    pickedUpCardId = null;
+    document.querySelectorAll('.card').forEach((el) => el.classList.remove('picked-up'));
+    setPicking(false);
+    if (message) announce(message);
+  }
+
+  function handleActivateCard(cardId) {
+    if (!pickedUpCardId) {
+      pickedUpCardId = cardId;
+      document.querySelectorAll('.card').forEach((el) => {
+        el.classList.toggle('picked-up', el.dataset.cardId === cardId);
+      });
+      setPicking(true);
+      announce(`Picked up "${cardById(cardId).text}". Choose another card to swap with it, or an empty position, then press Enter. Press Escape to cancel.`);
+      return;
+    }
+    if (pickedUpCardId === cardId) {
+      releasePickup('Put back down. Nothing moved.');
+      return;
+    }
+    const saved = pickedUpCardId;
+    const pickedText = cardById(saved).text;
+    const targetText = cardById(cardId).text;
+    const targetSlot = slotIndexOf(cardId);
+    const target = targetSlot !== -1 ? targetSlot : 'pool';
+    pickedUpCardId = null;
+    setPicking(false);
+    pendingFocusCardId = saved;
+    moveCard(saved, target);
+    announce(`Placed "${pickedText}", swapped with "${targetText}".`);
+  }
+
+  function handleActivateSlot(slotIndex) {
+    if (!pickedUpCardId) {
+      announce('Empty position. Pick up a card first, then choose a position to place it.');
+      return;
+    }
+    const saved = pickedUpCardId;
+    const text = cardById(saved).text;
+    pickedUpCardId = null;
+    setPicking(false);
+    pendingFocusCardId = saved;
+    moveCard(saved, slotIndex);
+    announce(`Placed "${text}" in position ${slotIndex + 1} of 9.`);
+  }
+
+  // --- Keyboard navigation: Tab reaches every card/empty slot; arrow keys
+  // jump directly between them; Enter/Space activates; Escape cancels. ---
+
+  function getFocusableItems() {
+    const items = [];
+    poolEl.querySelectorAll('.card').forEach((el) => items.push(el));
+    for (let i = 0; i < 9; i += 1) {
+      const slotEl = diamondEl.querySelector(`[data-slot-index="${i}"]`);
+      const cardEl = slotEl.querySelector('.card');
+      items.push(cardEl || slotEl);
+    }
+    return items;
+  }
+
+  function onKeyDown(e) {
+    const cardEl = e.target.closest('.card');
+    const slotEl = !cardEl ? e.target.closest('.slot') : null;
+    if (!cardEl && !slotEl) return;
+    const currentEl = cardEl || slotEl;
+
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const items = getFocusableItems();
+      const idx = items.indexOf(currentEl);
+      if (idx !== -1) items[(idx + 1) % items.length].focus();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const items = getFocusableItems();
+      const idx = items.indexOf(currentEl);
+      if (idx !== -1) items[(idx - 1 + items.length) % items.length].focus();
+    } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      if (cardEl) handleActivateCard(cardEl.dataset.cardId);
+      else handleActivateSlot(Number(slotEl.dataset.slotIndex));
+    } else if (e.key === 'Escape' && pickedUpCardId) {
+      e.preventDefault();
+      releasePickup('Cancelled. Card stays where it was.');
+    }
+  }
+
+  // --- Pointer-based drag (mouse) with a tap-to-place fallback (touch/click) ---
+  //
+  // A press that never moves past a small threshold is treated as a tap
+  // (pick up / place), same as keyboard activation. Only a press that moves
+  // further becomes a drag.
+
+  const DRAG_THRESHOLD = 6;
   let dragState = null;
 
   function attachDragHandlers() {
@@ -176,30 +309,39 @@
     if (e.button !== undefined && e.button !== 0) return;
     const el = e.currentTarget;
     el.setPointerCapture(e.pointerId);
-    const rect = el.getBoundingClientRect();
     dragState = {
       el,
       cardId: el.dataset.cardId,
-      offsetX: e.clientX - rect.left,
-      offsetY: e.clientY - rect.top,
-      startX: rect.left,
-      startY: rect.top,
-      width: rect.width,
-      height: rect.height,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      dragging: false,
     };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }
+
+  function beginDrag(e) {
+    const { el } = dragState;
+    const rect = el.getBoundingClientRect();
+    dragState.dragging = true;
+    dragState.offsetX = e.clientX - rect.left;
+    dragState.offsetY = e.clientY - rect.top;
     el.classList.add('dragging');
     el.style.position = 'fixed';
     el.style.left = `${rect.left}px`;
     el.style.top = `${rect.top}px`;
     el.style.width = `${rect.width}px`;
-    el.style.zIndex = '10';
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+    el.style.zIndex = '60';
   }
 
   function onPointerMove(e) {
     if (!dragState) return;
+    if (!dragState.dragging) {
+      const dx = e.clientX - dragState.startClientX;
+      const dy = e.clientY - dragState.startClientY;
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      beginDrag(e);
+    }
     dragState.el.style.left = `${e.clientX - dragState.offsetX}px`;
     dragState.el.style.top = `${e.clientY - dragState.offsetY}px`;
 
@@ -210,19 +352,25 @@
 
   function onPointerUp(e) {
     if (!dragState) return;
-    const { el, cardId } = dragState;
-    const dropZone = findDropZone(e.clientX, e.clientY);
+    const { el, cardId, dragging } = dragState;
 
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    document.querySelectorAll('.drop-target').forEach((n) => n.classList.remove('drop-target'));
+
+    if (!dragging) {
+      dragState = null;
+      handleActivateCard(cardId);
+      return;
+    }
+
+    const dropZone = findDropZone(e.clientX, e.clientY);
     el.classList.remove('dragging');
     el.style.position = '';
     el.style.left = '';
     el.style.top = '';
     el.style.width = '';
     el.style.zIndex = '';
-
-    window.removeEventListener('pointermove', onPointerMove);
-    window.removeEventListener('pointerup', onPointerUp);
-    document.querySelectorAll('.drop-target').forEach((n) => n.classList.remove('drop-target'));
     dragState = null;
 
     if (!dropZone) {
@@ -242,9 +390,50 @@
     return els.find((n) => n.classList.contains('slot') || n.id === 'pool') || null;
   }
 
-  // --- Submit ---
+  // Clicking directly on an empty slot's own area (not a card inside it)
+  // places a picked-up card there — the tap/click counterpart to Enter.
+  diamondEl.addEventListener('click', (e) => {
+    const slotEl = e.target.closest('.slot');
+    if (slotEl && e.target === slotEl) {
+      handleActivateSlot(Number(slotEl.dataset.slotIndex));
+    }
+  });
 
-  submitBtn.addEventListener('click', async () => {
+  diamondEl.addEventListener('keydown', onKeyDown);
+  poolEl.addEventListener('keydown', onKeyDown);
+
+  // --- Submit, with a confirm-before-sending review step ---
+
+  function openConfirmModal() {
+    confirmList.innerHTML = '';
+    slotAssignment.forEach((cardId, i) => {
+      const li = document.createElement('li');
+      li.textContent = cardById(cardId).text;
+      confirmList.appendChild(li);
+    });
+    confirmModal.hidden = false;
+    confirmSend.focus();
+    document.addEventListener('keydown', onModalKeyDown);
+  }
+
+  function closeConfirmModal() {
+    confirmModal.hidden = true;
+    document.removeEventListener('keydown', onModalKeyDown);
+    submitBtn.focus();
+  }
+
+  function onModalKeyDown(e) {
+    if (e.key === 'Escape') closeConfirmModal();
+  }
+
+  submitBtn.addEventListener('click', () => {
+    if (submitBtn.disabled) return;
+    openConfirmModal();
+  });
+
+  confirmBack.addEventListener('click', closeConfirmModal);
+
+  confirmSend.addEventListener('click', async () => {
     const arrangement = {};
     slotAssignment.forEach((cardId, i) => {
       arrangement[i] = cardId;
@@ -252,6 +441,7 @@
 
     if (!setId) {
       console.log('Demo mode (no ?set= in URL) — final arrangement:', arrangement);
+      closeConfirmModal();
       alert('Demo mode: no set loaded from the server, so nothing was saved. See console for the arrangement.');
       return;
     }
@@ -262,6 +452,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ student_name: studentName, arrangement }),
     });
+    closeConfirmModal();
     if (res.ok) {
       alert('Submitted, thank you!');
     } else {

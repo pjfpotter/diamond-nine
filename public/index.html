@@ -14,13 +14,14 @@
     <aside class="info-panel">
       <h1 id="set-title">Diamond Nine</h1>
       <p id="set-instructions" class="instructions">
-        Drag each card into the diamond. The card you agree with most goes at the top,
-        the one you agree with least at the bottom. Rearrange freely until you're happy, then submit.
-        Hover or focus a placed card to read it in full.
+        Drag a card into the diamond, or click/tap it to pick it up, then click/tap another
+        card to swap or an empty position to place it. The card you agree with most goes at
+        the top, the one you agree with least at the bottom. Rearrange freely until you're
+        happy, then submit. Hover or focus a placed card to read it in full.
       </p>
       <div class="actions">
         <button id="submit-btn" type="button" disabled>Submit</button>
-        <p id="submit-hint" class="hint">Place all 9 cards to enable submitting.</p>
+        <p id="submit-hint" class="hint">0 of 9 placed.</p>
       </div>
     </aside>
 
@@ -28,6 +29,20 @@
 
     <div class="diamond-area">
       <div class="diamond" id="diamond"></div>
+    </div>
+  </div>
+
+  <div id="live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="confirm-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h2 id="confirm-title">Confirm your order</h2>
+      <p class="modal-subtitle">From most agree (top) to least agree (bottom):</p>
+      <ol id="confirm-list" class="confirm-list"></ol>
+      <div class="modal-actions">
+        <button id="confirm-back" type="button" class="secondary">Keep adjusting</button>
+        <button id="confirm-send" type="button">Confirm and submit</button>
+      </div>
     </div>
   </div>
 
