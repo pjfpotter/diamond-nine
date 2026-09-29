@@ -70,10 +70,48 @@ narrow row gutter — not a rigid grid with empty placeholder cells.
 
 ## Out of scope for v1
 
-- Tutor accounts/auth (start with unauthenticated or a very simple shared-password approach — decide once we're building)
 - Analytics/reporting beyond viewing one student's result at a time
-- Real-time collaborative sort (this is designed for one student at a time, not simultaneous multi-user)
 - Image upload hosting — start with image URL field, revisit if it needs real uploads
+- Live collaborative mode (see its own section below) — a real future phase, not something to fold into the current async model incidentally
+
+## Live collaborative mode (scoped future phase, not current v1)
+
+Small groups are a common real session shape, and the pedagogical value of a
+diamond nine (disagreement in the middle row) depends on students seeing and
+reacting to each other live — which for a remote tutor means real-time sync,
+not just async solo submissions. This is a genuine future phase, deliberately
+scoped small enough to actually finish rather than open-ended "multiplayer":
+
+- **Shared state, not personal state.** The same board model that exists
+  today (slot assignment + pool) held server-side per session and broadcast
+  to everyone connected, instead of living only in one browser.
+- **Last-write-wins, full stop.** No operational-transform/CRDT merge logic.
+  Two people move at once, the later timestamp wins. For a low-stakes card
+  sort, "someone else already moved it" is a shrug, not a data-loss
+  incident — this alone removes the single biggest source of real
+  multiplayer complexity.
+- **Presence is a name list, not live cursors/avatars.** Highest visual
+  payoff, lowest functional necessity, meaningful extra work — cut from v1.
+- **Tutor moderation is two controls**: Reset board, End session (freeze the
+  board). Not per-student locking, not kick, not granular controls.
+- **Reconnection just refetches current state.** No resumable session state
+  machine — a dropped student rejoins and sees wherever the board currently
+  is.
+- **Transport: a managed realtime service** (e.g. Cloudflare Durable
+  Objects / PartyKit, or Supabase Realtime/Ably as alternatives) rather than
+  a hand-rolled WebSocket server with custom reconnection/heartbeat/presence
+  logic — the service absorbs connection lifecycle; app code is just "on
+  message, update shared state, broadcast." Cost at this scale is
+  effectively $0–10/month, not a real budget line.
+- **Test with simulated concurrent clients before real students ever see
+  it**: multiple headless browser contexts driving simultaneous
+  interactions (same card grabbed at once, drop-at-the-same-instant, a
+  dropped connection mid-drag) against the real backend, asserting the
+  board always converges to a sane state. This is the actual defense
+  against live bugs, not hoping it doesn't happen.
+- Explicitly still excluded even from this scoped version: live cursors,
+  per-card "who's dragging this" indicators, granular per-card locking,
+  session replay/history, and scaling past a handful of concurrent rooms.
 
 ## Tech shape
 
