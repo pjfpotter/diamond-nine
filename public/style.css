@@ -90,8 +90,56 @@ body {
   pointer-events: none;
 }
 
+.diamond-stage {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
 .diamond {
   pointer-events: auto;
+}
+
+/* Points toward the top of the diamond (most agree) with a green head and
+   the bottom (least agree) with a red one, so the ranking direction reads
+   at a glance without relying on the instructions text alone. */
+.hierarchy-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: stretch;
+  width: 1.5rem;
+}
+
+.hierarchy-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted-ink);
+  margin: 0.2rem 0;
+}
+
+.hierarchy-head {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  flex: 0 0 auto;
+}
+
+.hierarchy-head-top {
+  border-bottom: 11px solid #3f9e5c;
+}
+
+.hierarchy-head-bottom {
+  border-top: 11px solid #e2574c;
+}
+
+.hierarchy-shaft {
+  flex: 1 1 auto;
+  width: 5px;
+  min-height: 1rem;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #3f9e5c, #e2574c);
 }
 
 .info-panel {
