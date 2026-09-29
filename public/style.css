@@ -271,56 +271,39 @@ button:focus-visible {
   color: var(--muted-ink);
 }
 
-@media (max-width: 900px) {
-  :root {
-    --cell: 4.4rem;
-  }
-  .info-panel {
-    flex-basis: 12rem;
-  }
-  .pool {
-    flex-basis: 11rem;
-  }
+/* Below this width (roughly a tablet held in portrait, and all phones), a
+   proper single-user diamond nine doesn't fit at a usable scale. Show a
+   plain message instead of a squeezed, unusable layout. Revisit only if we
+   design a separate mobile-collaborative version. */
+.too-small-notice {
+  display: none;
 }
 
-@media (max-width: 640px) {
-  :root {
-    --cell: 3.6rem;
-  }
-  .layout {
-    flex-direction: column;
-    padding: 0.75rem;
-    gap: 0.6rem;
-  }
-  .info-panel {
-    order: 1;
-    flex: 0 0 auto;
-  }
-  .instructions {
+@media (max-width: 899px) {
+  .layout,
+  #live-region,
+  #confirm-modal {
     display: none;
   }
-  .actions {
-    margin-top: 0;
-    padding-top: 0.5rem;
+  .too-small-notice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    height: 100dvh;
+    padding: 2rem;
+    gap: 0.75rem;
   }
-  .pool {
-    order: 2;
-    flex: 0 0 auto;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    height: 8rem;
-    overflow-x: auto;
-    overflow-y: hidden;
+  .too-small-notice h1 {
+    margin: 0;
+    font-size: 1.4rem;
   }
-  .pool .card {
-    flex: 0 0 auto;
-    width: 9rem;
-    min-height: 0;
-    height: 100%;
-    font-size: 0.78rem;
-  }
-  .diamond-area {
-    order: 3;
+  .too-small-notice p {
+    margin: 0;
+    max-width: 26rem;
+    color: var(--muted-ink);
+    font-size: 1rem;
   }
 }
 
