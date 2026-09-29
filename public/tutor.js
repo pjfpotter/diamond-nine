@@ -73,9 +73,18 @@
   function renderWelcome() {
     mount(document.getElementById('tpl-welcome'));
     showNav(false);
-    document.getElementById('create-space-btn').addEventListener('click', async () => {
+    document.getElementById('create-space-btn').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
       const res = await api('/api/tutors', { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.token) {
+        btn.disabled = false;
+        const errorEl = document.getElementById('welcome-error');
+        errorEl.textContent = data.error || 'Could not create your tutor space. Please try again.';
+        errorEl.hidden = false;
+        return;
+      }
       setToken(data.token);
       location.hash = '#/save-link';
     });
