@@ -36,6 +36,11 @@
   const confirmList = document.getElementById('confirm-list');
   const confirmBack = document.getElementById('confirm-back');
   const confirmSend = document.getElementById('confirm-send');
+  const confirmNameInput = document.getElementById('confirm-name-input');
+  const confirmReview = document.getElementById('confirm-review');
+  const confirmSuccess = document.getElementById('confirm-success');
+  const confirmError = document.getElementById('confirm-error');
+  const confirmCloseBtn = document.getElementById('confirm-close-btn');
 
   let cards = DEMO_CARDS;
   let setId = new URLSearchParams(location.search).get('set');
@@ -431,8 +436,12 @@
       li.textContent = cardById(cardId).text;
       confirmList.appendChild(li);
     });
+    confirmNameInput.value = '';
+    confirmError.hidden = true;
+    confirmReview.hidden = false;
+    confirmSuccess.hidden = true;
     confirmModal.hidden = false;
-    confirmSend.focus();
+    confirmNameInput.focus();
     document.addEventListener('keydown', onModalKeyDown);
   }
 
@@ -440,6 +449,18 @@
     confirmModal.hidden = true;
     document.removeEventListener('keydown', onModalKeyDown);
     submitBtn.focus();
+  }
+
+  function showConfirmError(message) {
+    confirmError.textContent = message;
+    confirmError.hidden = false;
+  }
+
+  function showConfirmSuccess(message) {
+    confirmReview.hidden = true;
+    confirmSuccess.hidden = false;
+    if (message) confirmSuccess.querySelector('.modal-subtitle').textContent = message;
+    confirmCloseBtn.focus();
   }
 
   function onModalKeyDown(e) {
@@ -461,32 +482,42 @@
   });
 
   confirmBack.addEventListener('click', closeConfirmModal);
+  confirmCloseBtn.addEventListener('click', closeConfirmModal);
 
   confirmSend.addEventListener('click', async () => {
     const arrangement = {};
     slotAssignment.forEach((cardId, i) => {
       arrangement[i] = cardId;
     });
+    confirmError.hidden = true;
 
     if (!setId) {
       console.log('Demo mode (no ?set= in URL) — final arrangement:', arrangement);
-      closeConfirmModal();
-      alert('Demo mode: no set loaded from the server, so nothing was saved. See console for the arrangement.');
+      showConfirmSuccess('Demo mode: nothing was actually saved (see the browser console for the arrangement).');
       return;
     }
 
-    const studentName = prompt('Your name (optional):') || undefined;
-    const res = await fetch(`/api/sets/${setId}/results`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ student_name: studentName, arrangement }),
-    });
-    closeConfirmModal();
+    const studentName = confirmNameInput.value.trim() || undefined;
+    confirmSend.disabled = true;
+    let res;
+    try {
+      res = await fetch(`/api/sets/${setId}/results`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_name: studentName, arrangement }),
+      });
+    } catch (err) {
+      confirmSend.disabled = false;
+      showConfirmError('Could not reach the server. Check your connection and try again.');
+      return;
+    }
+    confirmSend.disabled = false;
+
     if (res.ok) {
-      alert('Submitted, thank you!');
+      showConfirmSuccess();
     } else {
       const body = await res.json().catch(() => ({}));
-      alert(`Could not submit: ${body.error || res.statusText}`);
+      showConfirmError(`Could not submit: ${body.error || res.statusText}`);
     }
   });
 
@@ -509,6 +540,9 @@
             titleEl.hidden = true;
           }
           if (data.instructions) instructionsEl.textContent = data.instructions;
+          document.documentElement.dataset.font = data.font || 'lexend';
+          document.documentElement.dataset.fontSize = data.font_size || 'medium';
+          document.documentElement.dataset.colourScheme = data.colour_scheme || 'cream-navy';
         } else {
           console.warn('Could not load set, falling back to demo cards');
         }

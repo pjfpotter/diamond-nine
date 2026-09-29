@@ -36,6 +36,41 @@ html, body {
   height: 100%;
 }
 
+/* Curated, bounded accessibility choices a tutor picks per task — never a
+   free picker. Colour schemes override the canvas/ink tokens above; font
+   size sets the rem basis on the root so the whole UI scales together
+   (nearly everything below is sized in rem for exactly this reason);
+   font swaps the family used across the app. */
+html[data-colour-scheme="soft-grey"] {
+  --canvas: #ececeb;
+  --dot: #dcdcda;
+  --ink: #22262b;
+  --muted-ink: #6b6e73;
+}
+
+html[data-colour-scheme="pale-blue"] {
+  --canvas: #eaf1fb;
+  --dot: #d7e4f3;
+  --ink: #1c2b3a;
+  --muted-ink: #4f6377;
+}
+
+html[data-font-size="small"] {
+  font-size: 14px;
+}
+
+html[data-font-size="large"] {
+  font-size: 19px;
+}
+
+html[data-font="atkinson-hyperlegible"] body {
+  font-family: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+}
+
+html[data-font="system"] body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
 body {
   margin: 0;
   font-family: "Lexend", "Segoe UI", system-ui, sans-serif;
@@ -442,6 +477,40 @@ button:focus-visible {
 .modal-card h2 {
   margin: 0 0 0.3rem;
   font-size: 1.2rem;
+}
+
+.modal-card .field {
+  display: block;
+  margin: 0.9rem 0;
+}
+
+.modal-card .field > span:first-child {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+
+.modal-card .field input[type="text"] {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1.5px solid #d9d5c9;
+  background: #fff;
+  color: var(--ink);
+}
+
+.muted {
+  color: var(--muted-ink);
+  font-weight: 400;
+}
+
+.error-text {
+  color: #b3261e;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
 }
 
 .modal-subtitle {

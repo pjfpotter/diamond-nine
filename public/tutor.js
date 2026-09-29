@@ -94,6 +94,47 @@
     });
   }
 
+  // Deleting is destructive (the task and all its results), so it needs a
+  // deliberate second step - but a native confirm() dialog is jarring and
+  // inconsistent with the rest of the app, so this is a simple two-click
+  // pattern: first click arms it, second click (within a few seconds)
+  // actually deletes; anything else re-arms the button back to normal.
+  function bindDeleteButton(btn, id, title, li) {
+    let armed = false;
+    let timer = null;
+
+    btn.addEventListener('click', async () => {
+      if (!armed) {
+        armed = true;
+        btn.textContent = 'Really delete?';
+        btn.classList.add('danger');
+        timer = setTimeout(() => {
+          armed = false;
+          btn.textContent = 'Delete';
+          btn.classList.remove('danger');
+        }, 4000);
+        return;
+      }
+
+      clearTimeout(timer);
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+      const res = await api(`/api/sets/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        li.remove();
+        announce(`Deleted "${title}".`);
+        if (!document.querySelector('.task-item')) {
+          document.getElementById('dashboard-empty').hidden = false;
+        }
+      } else {
+        btn.disabled = false;
+        armed = false;
+        btn.textContent = 'Delete';
+        btn.classList.remove('danger');
+      }
+    });
+  }
+
   async function renderDashboard() {
     mount(document.getElementById('tpl-dashboard'));
     showNav(true);
@@ -119,10 +160,12 @@
         <div class="task-item-actions">
           <a href="#/edit/${encodeURIComponent(set.id)}">Edit</a>
           <a href="#/results/${encodeURIComponent(set.id)}">Results</a>
+          <button type="button" class="secondary delete-task-btn">Delete</button>
         </div>
       `;
       li.querySelector('.task-item-title').textContent = title;
       li.querySelector('.task-item-meta').textContent = `Updated ${formatDate(set.updated_at)}`;
+      bindDeleteButton(li.querySelector('.delete-task-btn'), set.id, title, li);
       listEl.appendChild(li);
     });
 
@@ -164,6 +207,9 @@
         const data = await res.json();
         document.getElementById('field-title').value = data.title || '';
         document.getElementById('field-instructions').value = data.instructions || '';
+        document.getElementById('field-font').value = data.font || 'lexend';
+        document.getElementById('field-font-size').value = data.font_size || 'medium';
+        document.getElementById('field-colour-scheme').value = data.colour_scheme || 'cream-navy';
         data.cards.forEach((c, i) => {
           if (cardInputs[i]) {
             cardInputs[i].text.value = c.text || '';
@@ -193,6 +239,9 @@
       const payload = {
         title: document.getElementById('field-title').value.trim(),
         instructions: document.getElementById('field-instructions').value.trim(),
+        font: document.getElementById('field-font').value,
+        font_size: document.getElementById('field-font-size').value,
+        colour_scheme: document.getElementById('field-colour-scheme').value,
         cards,
       };
 

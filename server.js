@@ -18,7 +18,7 @@ db.exec(`
     tutor_token TEXT NOT NULL REFERENCES tutors(token),
     title TEXT NOT NULL DEFAULT '',
     instructions TEXT NOT NULL DEFAULT '',
-    font TEXT NOT NULL DEFAULT 'atkinson-hyperlegible',
+    font TEXT NOT NULL DEFAULT 'lexend',
     font_size TEXT NOT NULL DEFAULT 'medium',
     colour_scheme TEXT NOT NULL DEFAULT 'cream-navy',
     cards TEXT NOT NULL DEFAULT '[]',
@@ -53,6 +53,18 @@ function isSafeImageUrl(value) {
   } catch {
     return false;
   }
+}
+
+// Curated, bounded choices — never a free picker — per the accessibility
+// requirement that these stay pre-vetted rather than freeform.
+const ALLOWED_FONTS = ['lexend', 'atkinson-hyperlegible', 'system'];
+const ALLOWED_FONT_SIZES = ['small', 'medium', 'large'];
+const ALLOWED_COLOUR_SCHEMES = ['cream-navy', 'soft-grey', 'pale-blue'];
+
+function validateChoice(value, allowed, label) {
+  if (value === undefined || value === null) return null;
+  if (!allowed.includes(value)) return `${label} must be one of: ${allowed.join(', ')}`;
+  return null;
 }
 
 function validateCards(cards) {
@@ -94,14 +106,18 @@ app.get('/api/tutor/sets', requireTutor, (req, res) => {
 
 app.post('/api/sets', requireTutor, (req, res) => {
   const { title = '', instructions = '', font, font_size, colour_scheme, cards } = req.body || {};
-  const error = validateCards(cards);
+  const error =
+    validateCards(cards) ||
+    validateChoice(font, ALLOWED_FONTS, 'font') ||
+    validateChoice(font_size, ALLOWED_FONT_SIZES, 'font_size') ||
+    validateChoice(colour_scheme, ALLOWED_COLOUR_SCHEMES, 'colour_scheme');
   if (error) return res.status(400).json({ error });
 
   const id = newId();
   db.prepare(
     `INSERT INTO sets (id, tutor_token, title, instructions, font, font_size, colour_scheme, cards)
      VALUES (@id, @tutor_token, @title, @instructions,
-       COALESCE(@font, 'atkinson-hyperlegible'),
+       COALESCE(@font, 'lexend'),
        COALESCE(@font_size, 'medium'),
        COALESCE(@colour_scheme, 'cream-navy'),
        @cards)`
@@ -125,7 +141,11 @@ app.put('/api/sets/:id', requireTutor, (req, res) => {
   if (existing.tutor_token !== req.tutorToken) return res.status(403).json({ error: 'not your set' });
 
   const { title = '', instructions = '', font, font_size, colour_scheme, cards } = req.body || {};
-  const error = validateCards(cards);
+  const error =
+    validateCards(cards) ||
+    validateChoice(font, ALLOWED_FONTS, 'font') ||
+    validateChoice(font_size, ALLOWED_FONT_SIZES, 'font_size') ||
+    validateChoice(colour_scheme, ALLOWED_COLOUR_SCHEMES, 'colour_scheme');
   if (error) return res.status(400).json({ error });
 
   db.prepare(
@@ -146,6 +166,20 @@ app.put('/api/sets/:id', requireTutor, (req, res) => {
     cards: JSON.stringify(cards),
   });
 
+  res.json({ ok: true });
+});
+
+const deleteSetAndResults = db.transaction((id) => {
+  db.prepare('DELETE FROM results WHERE set_id = ?').run(id);
+  db.prepare('DELETE FROM sets WHERE id = ?').run(id);
+});
+
+app.delete('/api/sets/:id', requireTutor, (req, res) => {
+  const existing = db.prepare('SELECT tutor_token FROM sets WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'set not found' });
+  if (existing.tutor_token !== req.tutorToken) return res.status(403).json({ error: 'not your set' });
+
+  deleteSetAndResults(req.params.id);
   res.json({ ok: true });
 });
 

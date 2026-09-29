@@ -6,7 +6,7 @@
   <title>Diamond Nine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -55,12 +55,26 @@
 
   <div id="confirm-modal" class="modal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-      <h2 id="confirm-title">Confirm your order</h2>
-      <p class="modal-subtitle">From most agree (top) to least agree (bottom):</p>
-      <ol id="confirm-list" class="confirm-list"></ol>
-      <div class="modal-actions">
-        <button id="confirm-back" type="button" class="secondary">Keep adjusting</button>
-        <button id="confirm-send" type="button">Confirm and submit</button>
+      <div id="confirm-review">
+        <h2 id="confirm-title">Confirm your order</h2>
+        <label class="field" for="confirm-name-input">
+          <span>Your name <span class="muted">(optional)</span></span>
+          <input type="text" id="confirm-name-input" maxlength="200" autocomplete="name" />
+        </label>
+        <p class="modal-subtitle">From most agree (top) to least agree (bottom):</p>
+        <ol id="confirm-list" class="confirm-list"></ol>
+        <p id="confirm-error" class="error-text" role="alert" hidden></p>
+        <div class="modal-actions">
+          <button id="confirm-back" type="button" class="secondary">Keep adjusting</button>
+          <button id="confirm-send" type="button">Confirm and submit</button>
+        </div>
+      </div>
+      <div id="confirm-success" hidden>
+        <h2>Submitted — thank you!</h2>
+        <p class="modal-subtitle">Your arrangement has been sent.</p>
+        <div class="modal-actions">
+          <button id="confirm-close-btn" type="button">Close</button>
+        </div>
       </div>
     </div>
   </div>
