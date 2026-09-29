@@ -11,17 +11,27 @@ A simple web app for online tutors to run a diamond nine card sort task with stu
   screens get a "this app works best on a larger screen" message instead of a
   squeezed layout. Revisit only if/when we design a separate mobile-collaborative
   reimagining (multiple students on one sort) - not a current priority.
-- Design status (2026-09-29): user feedback is that the mechanics/accessibility
-  work is solid but the visual design is weak - this is now explicitly a
-  design/UX problem, not an engineering one. Visual north star: Miro's look and
-  feel (flat colored blocks, generous canvas whitespace, rounded rectangles,
-  light neutral background with saturated accent colors used sparingly, soft
-  shadows over borders, friendly rounded sans-serif). Plan: use the `design`
-  skill to mock up 2-3 genuinely different board layouts as a visual canvas
-  (not hand-edited CSS) for the user to react to, before touching production
-  code. `web-design-guidelines` skill (Vercel, installed in this project under
-  .agents/skills/) is a review/audit tool for AFTER building, not a generator -
-  run it against the real HTML/CSS once a direction is chosen. The user was
-  also trying to install Anthropic's `frontend-design` plugin via an install
-  card but it had not taken effect as of end of this session - check whether
-  it's available before assuming it isn't.
+- Design direction (2026-09-29): visual north star is Miro's look and feel.
+  Landed on "Sticky Canvas" - cards as colored sticky notes on a dotted
+  canvas, pool and info panel as floating rounded panels, Lexend font. This
+  is built and live in public/. `web-design-guidelines` skill (Vercel,
+  installed under .agents/skills/) is a review/audit tool for checking
+  finished HTML/CSS against best practices, not a generator.
+- Product direction (2026-09-30): confirmed with the user -
+  - Session model is commonly small groups, not just 1:1 - the pedagogical
+    value of a diamond nine (disagreement in the middle row) depends on
+    students being able to see and react to each other, which for a remote
+    tutor means live sync eventually matters, not just async solo sorting.
+  - Live-collaborative (Miro-style: multiple students on one shared board,
+    tutor watching/moderating) is real-time infrastructure (sync, presence,
+    conflict handling, moderation UI) and is explicitly its own future
+    project - not something to bolt onto the current model. Design it
+    properly when we get there rather than half-building it now.
+  - Immediate next milestone (in progress): tutor accounts and task
+    management - sign up (capability-token/link, no password, per the
+    earlier decision - see spec.md), dashboard listing saved sets,
+    create/edit a task, generate/copy its shareable link, view results.
+    Built against the current async single-student-at-a-time model.
+  - Students never get accounts. An optional display name (already
+    supported server-side via `student_name` on results) is the only
+    identity - no login, ever, for students.

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diamond Nine — Tutor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="tutor.css" />
+</head>
+<body class="tutor-body">
+  <div id="live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+  <header class="tutor-header">
+    <h1>Diamond Nine</h1>
+    <nav id="tutor-nav" class="tutor-nav" hidden>
+      <a href="#/dashboard">My tasks</a>
+    </nav>
+  </header>
+
+  <main id="app" class="tutor-main"></main>
+
+  <template id="tpl-welcome">
+    <section class="panel welcome-panel">
+      <h2>Set up your tutor space</h2>
+      <p>No password to remember — we give you a private link that acts as your login.
+        Bookmark it, and you're back in whenever you open it.</p>
+      <button id="create-space-btn" type="button">Create my tutor space</button>
+    </section>
+  </template>
+
+  <template id="tpl-save-link">
+    <section class="panel">
+      <h2>Save this link</h2>
+      <p>This link is how you get back into your dashboard. There's no password —
+        whoever has this link has access, so keep it private, and bookmark it now.</p>
+      <div class="link-row">
+        <input type="text" id="dashboard-link-input" readonly />
+        <button type="button" id="copy-dashboard-link-btn" class="secondary">Copy</button>
+      </div>
+      <button type="button" id="continue-to-dashboard-btn">Continue to my dashboard</button>
+    </section>
+  </template>
+
+  <template id="tpl-dashboard">
+    <section class="panel">
+      <div class="panel-header-row">
+        <h2>My tasks</h2>
+        <button type="button" id="new-task-btn">+ New task</button>
+      </div>
+      <p id="dashboard-empty" class="muted" hidden>No tasks yet — create your first one.</p>
+      <ul id="task-list" class="task-list"></ul>
+      <button type="button" id="show-dashboard-link-btn" class="secondary link-btn">
+        Show my dashboard link
+      </button>
+    </section>
+  </template>
+
+  <template id="tpl-editor">
+    <section class="panel editor-panel">
+      <div class="panel-header-row">
+        <h2 id="editor-heading">New task</h2>
+        <a href="#/dashboard" class="back-link">&larr; Back to my tasks</a>
+      </div>
+
+      <form id="task-form">
+        <label class="field">
+          <span>Title <span class="muted">(optional — leave blank to show none)</span></span>
+          <input type="text" id="field-title" maxlength="200" />
+        </label>
+
+        <label class="field">
+          <span>Instructions <span class="muted">(optional)</span></span>
+          <textarea id="field-instructions" rows="3" maxlength="1000"></textarea>
+        </label>
+
+        <fieldset class="cards-fieldset">
+          <legend>Nine cards</legend>
+          <div id="card-fields" class="card-fields"></div>
+        </fieldset>
+
+        <p id="editor-error" class="error-text" role="alert" hidden></p>
+
+        <div class="editor-actions">
+          <button type="submit" id="save-task-btn">Save task</button>
+          <span id="editor-status" class="muted"></span>
+        </div>
+      </form>
+
+      <div id="share-block" class="share-block" hidden>
+        <h3>Shareable link</h3>
+        <p class="muted">Anyone with this link can open the task as a student — no login needed.</p>
+        <div class="link-row">
+          <input type="text" id="share-link-input" readonly />
+          <button type="button" id="copy-share-link-btn" class="secondary">Copy</button>
+        </div>
+        <a id="view-results-link" href="#">View results &rarr;</a>
+      </div>
+    </section>
+  </template>
+
+  <template id="tpl-results">
+    <section class="panel">
+      <div class="panel-header-row">
+        <h2 id="results-heading">Results</h2>
+        <a href="#/dashboard" class="back-link">&larr; Back to my tasks</a>
+      </div>
+      <p id="results-empty" class="muted" hidden>No submissions yet.</p>
+      <div id="results-list" class="results-list"></div>
+    </section>
+  </template>
+
+  <script src="tutor.js"></script>
+</body>
+</html>
