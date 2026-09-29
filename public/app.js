@@ -27,6 +27,7 @@
   const diamondEl = document.getElementById('diamond');
   const poolEl = document.getElementById('pool');
   const submitBtn = document.getElementById('submit-btn');
+  const resetBtn = document.getElementById('reset-btn');
   const submitHint = document.getElementById('submit-hint');
   const titleEl = document.getElementById('set-title');
   const instructionsEl = document.getElementById('set-instructions');
@@ -169,6 +170,7 @@
     const placed = 9 - pool.length;
     const allPlaced = placed === 9;
     submitBtn.disabled = !allPlaced;
+    resetBtn.disabled = placed === 0;
     submitHint.textContent = allPlaced
       ? 'All 9 placed — ready to submit.'
       : `${placed} of 9 placed.`;
@@ -447,6 +449,15 @@
   submitBtn.addEventListener('click', () => {
     if (submitBtn.disabled) return;
     openConfirmModal();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    if (resetBtn.disabled) return;
+    releasePickup();
+    pendingFocusCardId = null;
+    initState();
+    render();
+    announce('Board reset. All cards moved back to the pool.');
   });
 
   confirmBack.addEventListener('click', closeConfirmModal);
