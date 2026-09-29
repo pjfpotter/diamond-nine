@@ -500,7 +500,14 @@
         if (res.ok) {
           const data = await res.json();
           cards = data.cards.map((c, i) => ({ id: `card-${i}`, text: c.text }));
-          titleEl.textContent = data.title || 'Diamond Nine';
+          // A task title is optional for the tutor to set - if they left it
+          // blank, don't show a fake title in its place, just omit it.
+          if (data.title && data.title.trim()) {
+            titleEl.textContent = data.title;
+            titleEl.hidden = false;
+          } else {
+            titleEl.hidden = true;
+          }
           if (data.instructions) instructionsEl.textContent = data.instructions;
         } else {
           console.warn('Could not load set, falling back to demo cards');

@@ -25,7 +25,9 @@ Known failure mode: it gets stale with overuse, so this tool should be quick to 
 
 - Dashboard listing the tutor's saved sets
 - Create/edit a set:
-  - Title
+  - Title — optional, not forced. Tutors running this live may not want one
+    on screen at all; if left blank, the student view shows no title rather
+    than a generic placeholder standing in for it.
   - Instructions text (the prompt/question framing the sort)
   - Nine cards, each with text and an optional image
   - Font choice from a curated list of accessible fonts
