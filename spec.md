@@ -35,6 +35,19 @@ Known failure mode: it gets stale with overuse, so this tool should be quick to 
 - Save sets for reuse across students/sessions
 - View submitted results per link (which student, if named, and their final arrangement)
 
+## Diamond geometry (locked rule — do not re-litigate)
+
+The 1-2-3-2-1 rows must be tightly packed and centered so the overall shape
+reads unambiguously as a diamond/rhombus. Only a narrow gutter (a few
+pixels — much smaller than a card) separates cards within a row and between
+rows. Never implement this as a fixed 5-column grid with implicit blank
+cells at the non-slot positions (e.g. the middle column on rows 2 and 4) —
+that renders as card-sized holes in the shape, makes it look like a square
+tipped on its side rather than a diamond, and makes people wonder whether
+those gaps are meant to be filled. Build each row as its own centered group
+of exactly as many cards as that row has (1, 2, 3, 2, 1), stacked with a
+narrow row gutter — not a rigid grid with empty placeholder cells.
+
 ## Student-side features
 
 - Open via link, no account needed

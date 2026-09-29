@@ -14,13 +14,13 @@
   ];
 
   // Diamond shape: rows of 1-2-3-2-1 slots, indexed 0..8 in that order.
-  const SLOT_LAYOUT = [
-    { row: 1, col: 0 },
-    { row: 2, col: 0 }, { row: 2, col: 1 },
-    { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 },
-    { row: 4, col: 0 }, { row: 4, col: 1 },
-    { row: 5, col: 0 },
-  ];
+  // Each row is its own tightly-packed group (see buildSlots) so the shape
+  // reads as an actual diamond, not a grid with card-sized holes in it.
+  const ROW_SIZES = [1, 2, 3, 2, 1];
+
+  // Stable per-card colors (by card id) so a card keeps its color as it
+  // moves between the pool and the diamond.
+  const CARD_COLORS = ['coral', 'yellow', 'teal', 'violet'];
 
   const diamondEl = document.getElementById('diamond');
   const poolEl = document.getElementById('pool');
@@ -66,21 +66,31 @@
 
   function buildSlots() {
     diamondEl.innerHTML = '';
-    SLOT_LAYOUT.forEach((pos, i) => {
-      const slot = document.createElement('div');
-      slot.className = 'slot';
-      slot.dataset.slotIndex = String(i);
-      slot.dataset.row = String(pos.row);
-      slot.dataset.col = String(pos.col);
-      slot.setAttribute('role', 'button');
-      slot.setAttribute('aria-label', `Empty position ${i + 1} of 9`);
-      diamondEl.appendChild(slot);
+    let i = 0;
+    ROW_SIZES.forEach((size) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'diamond-row';
+      for (let c = 0; c < size; c += 1) {
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        slot.dataset.slotIndex = String(i);
+        slot.setAttribute('role', 'button');
+        slot.setAttribute('aria-label', `Empty position ${i + 1} of 9`);
+        rowEl.appendChild(slot);
+        i += 1;
+      }
+      diamondEl.appendChild(rowEl);
     });
+  }
+
+  function cardColor(cardId) {
+    const index = cards.findIndex((c) => c.id === cardId);
+    return CARD_COLORS[index % CARD_COLORS.length];
   }
 
   function makeCardEl(card) {
     const el = document.createElement('div');
-    el.className = 'card';
+    el.className = `card card-${cardColor(card.id)}`;
     el.dataset.cardId = card.id;
     el.tabIndex = 0;
     el.textContent = card.text;

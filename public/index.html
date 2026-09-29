@@ -6,7 +6,7 @@
   <title>Diamond Nine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -17,6 +17,15 @@
   </div>
 
   <div class="layout">
+    <div class="pool-panel">
+      <div class="pool-label" id="pool-label">Cards to sort</div>
+      <div class="pool" id="pool" aria-labelledby="pool-label"></div>
+    </div>
+
+    <div class="diamond-area">
+      <div class="diamond" id="diamond"></div>
+    </div>
+
     <aside class="info-panel">
       <h1 id="set-title">Diamond Nine</h1>
       <p id="set-instructions" class="instructions">
@@ -30,12 +39,6 @@
         <p id="submit-hint" class="hint">0 of 9 placed.</p>
       </div>
     </aside>
-
-    <div class="pool" id="pool" aria-label="Unplaced cards"></div>
-
-    <div class="diamond-area">
-      <div class="diamond" id="diamond"></div>
-    </div>
   </div>
 
   <div id="live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
