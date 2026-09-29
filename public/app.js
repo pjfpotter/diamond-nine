@@ -22,6 +22,8 @@
   // moves between the pool and the diamond.
   const CARD_COLORS = ['coral', 'yellow', 'teal', 'violet'];
 
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   const diamondEl = document.getElementById('diamond');
   const poolEl = document.getElementById('pool');
   const submitBtn = document.getElementById('submit-btn');
@@ -93,9 +95,12 @@
     el.className = `card card-${cardColor(card.id)}`;
     el.dataset.cardId = card.id;
     el.tabIndex = 0;
-    el.textContent = card.text;
     el.setAttribute('role', 'button');
     el.setAttribute('aria-label', card.text);
+    const textEl = document.createElement('span');
+    textEl.className = 'card-text';
+    textEl.textContent = card.text;
+    el.appendChild(textEl);
     if (card.id === pickedUpCardId) el.classList.add('picked-up');
     return el;
   }
@@ -139,10 +144,13 @@
       const dx = before.left - after.left;
       const dy = before.top - after.top;
       if (dx === 0 && dy === 0) return;
+      if (prefersReducedMotion) return; // snap instantly, no motion
       el.style.transition = 'none';
       el.style.transform = `translate(${dx}px, ${dy}px)`;
       requestAnimationFrame(() => {
-        el.style.transition = 'transform 0.2s ease';
+        // A slight overshoot-then-settle easing makes the drop feel decisive
+        // rather than just gliding to a stop.
+        el.style.transition = 'transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1)';
         el.style.transform = '';
       });
     });
