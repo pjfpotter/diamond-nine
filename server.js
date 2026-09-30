@@ -104,7 +104,7 @@ function validateCards(cards) {
   for (const [i, card] of cards.entries()) {
     if (!card || typeof card !== 'object') return `card ${i} is invalid`;
     if (typeof card.text !== 'string') return `card ${i} is missing text`;
-    if (card.text.length > 120) return `card ${i} text is too long`;
+    if (card.text.length > 50) return `card ${i} text is too long`;
   }
   return null;
 }

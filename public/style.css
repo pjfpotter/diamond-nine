@@ -275,11 +275,12 @@ body.picking .pool {
    class (see app.js), not :hover directly - a freshly dropped card sits
    right under the cursor and :hover would fire on it immediately, which
    read as "the drop shadow/rotation is stuck"; .magnify only gets added on
-   a real mouseenter. Excludes .picked-up: without this, a card picked up
-   by click/tap while the cursor still rests on it would take on this
-   rule's size/position instead of the picked-up lift, since this selector
-   is more specific. */
-.diamond .card.magnify:not(.picked-up),
+   a real mouseenter. Excludes .picked-up and .dragging: without this, a
+   card picked up by click/tap, or grabbed to drag, while the cursor still
+   rests on it would take on this rule's size/position instead of its own
+   state, since this selector is more specific - app.js also strips
+   .magnify before a drag starts, but this is defense in depth. */
+.diamond .card.magnify:not(.picked-up):not(.dragging),
 .diamond .card:focus-visible:not(.picked-up) {
   position: absolute;
   top: 0;
@@ -294,7 +295,7 @@ body.picking .pool {
   box-shadow: 0 16px 32px rgba(34, 38, 43, 0.3);
 }
 
-.diamond .card.magnify:not(.picked-up) .card-text,
+.diamond .card.magnify:not(.picked-up):not(.dragging) .card-text,
 .diamond .card:focus-visible:not(.picked-up) .card-text {
   display: block;
   -webkit-line-clamp: unset;

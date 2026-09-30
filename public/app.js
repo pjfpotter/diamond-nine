@@ -59,6 +59,13 @@
   // freshly-created element can swallow the "born under the cursor" enter
   // event once (see makeCardEl's mouseenter handling) instead of magnifying.
   let justMovedCardId = null;
+  // Set right before moveCard() for a mouse-drag release: that card's FLIP
+  // settle animation is skipped entirely (see render()). The card already
+  // visually followed the cursor for the whole drag; animating a second
+  // "glide into place" afterwards read as the card flying off and
+  // snapping back, which didn't make sense on top of a drag that just
+  // ended under the user's own hand.
+  let dragDroppedCardId = null;
 
   function initState() {
     slotAssignment = new Array(9).fill(null);
@@ -168,9 +175,16 @@
     });
 
     justMovedCardId = null;
+    const skipAnimationCardId = dragDroppedCardId;
+    dragDroppedCardId = null;
 
     // FLIP: for any card whose position changed, animate from old to new.
+    // A card just released from a mouse drag is skipped entirely - it
+    // already visually followed the cursor for the whole drag, so a
+    // second "glide into place" after release just reads as an
+    // unexplained extra motion.
     document.querySelectorAll('.card').forEach((el) => {
+      if (el.dataset.cardId === skipAnimationCardId) return;
       const before = existingRects.get(el.dataset.cardId);
       if (!before) return;
       const after = el.getBoundingClientRect();
@@ -224,7 +238,10 @@
       displaced = null; // pool has no fixed capacity, no swap needed
     } else {
       displaced = slotAssignment[target];
-      if (displaced === cardId) return; // dropped on itself
+      if (displaced === cardId) {
+        dragDroppedCardId = null; // no render() coming, so nothing will consume this
+        return; // dropped on itself
+      }
     }
 
     if (fromSlot !== -1) slotAssignment[fromSlot] = null;
@@ -376,6 +393,11 @@
 
   function beginDrag(e) {
     const { el } = dragState;
+    // If this card was magnified (mouse hovering it before the drag
+    // started), strip that first - otherwise the rect below captures the
+    // magnified box's size/position and locks it into the dragged card's
+    // inline style, producing a wildly oversized/misshapen drag element.
+    el.classList.remove('magnify');
     const rect = el.getBoundingClientRect();
     dragState.dragging = true;
     dragState.offsetX = e.clientX - rect.left;
@@ -385,6 +407,12 @@
     el.style.left = `${rect.left}px`;
     el.style.top = `${rect.top}px`;
     el.style.width = `${rect.width}px`;
+    // Diamond cards are sized with CSS height:100% (of their slot). Once
+    // position becomes fixed, that percentage resolves against the
+    // viewport instead - pinning height explicitly, like width already is,
+    // is what keeps a dragged diamond card from stretching into a huge
+    // rectangle.
+    el.style.height = `${rect.height}px`;
     el.style.zIndex = '60';
   }
 
@@ -424,6 +452,7 @@
     el.style.left = '';
     el.style.top = '';
     el.style.width = '';
+    el.style.height = '';
     el.style.zIndex = '';
     dragState = null;
 
@@ -432,6 +461,7 @@
       return;
     }
 
+    dragDroppedCardId = cardId;
     if (dropZone.classList.contains('pool')) {
       moveCard(cardId, 'pool');
     } else {

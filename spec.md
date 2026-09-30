@@ -29,8 +29,12 @@ Known failure mode: it gets stale with overuse, so this tool should be quick to 
     on screen at all; if left blank, the student view shows no title rather
     than a generic placeholder standing in for it.
   - Instructions text (the prompt/question framing the sort)
-  - Nine cards, text only (up to 500 characters each). Images were
-    considered and deliberately dropped (2026-09-30 decision, do not
+  - Nine cards, text only, up to 50 characters each - measured directly
+    against the rendered card size (2026-09-30), not guessed: pool cards
+    wrap at ~27 characters per line before it looks bad, and a placed
+    diamond card (fixed-size, 5-line clamp) only has room for ~50-64
+    characters depending on word length before text gets cut off. Images
+    were considered and deliberately dropped (2026-09-30 decision, do not
     re-add without discussion): they don't suit the sticky-note visual
     design, and aren't typically used in real diamond nine tasks anyway.
 - Generate a shareable link per set
