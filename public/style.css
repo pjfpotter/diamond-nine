@@ -111,13 +111,6 @@ body {
   width: 1.5rem;
 }
 
-.hierarchy-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--muted-ink);
-  margin: 0.2rem 0;
-}
-
 .hierarchy-head {
   width: 0;
   height: 0;
@@ -300,6 +293,14 @@ body.picking .pool {
   display: block;
   -webkit-line-clamp: unset;
   overflow: visible;
+}
+
+/* Cards with 23+ characters (see app.js's .long-text) keep the card's
+   normal font size when magnified instead of growing it - at the larger
+   size that much text no longer wraps legibly in the magnified width, so
+   the extra width goes toward more wrapped lines instead of bigger text. */
+.diamond .card.magnify.long-text:not(.picked-up):not(.dragging) {
+  font-size: 0.75rem;
 }
 
 .card:focus-visible {

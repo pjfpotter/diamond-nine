@@ -119,6 +119,11 @@
     textEl.textContent = card.text;
     el.appendChild(textEl);
     if (card.id === pickedUpCardId) el.classList.add('picked-up');
+    // Cards with longer text keep the base font size when magnified rather
+    // than growing it - at the larger size, 23+ characters no longer wraps
+    // legibly in the magnified width, so the extra width is used for
+    // wrapping instead of for bigger text.
+    if (card.text.length >= 23) el.classList.add('long-text');
     // Magnify-on-hover is driven from mouseenter/leave rather than CSS
     // :hover, because a freshly dropped card sits right under the cursor -
     // and browsers re-run hit-testing after a DOM mutation and fire a
