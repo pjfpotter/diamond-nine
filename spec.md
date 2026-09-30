@@ -33,9 +33,6 @@ Known failure mode: it gets stale with overuse, so this tool should be quick to 
     considered and deliberately dropped (2026-09-30 decision, do not
     re-add without discussion): they don't suit the sticky-note visual
     design, and aren't typically used in real diamond nine tasks anyway.
-  - Font choice from a curated list of accessible fonts
-  - Font size setting
-  - Colour scheme chosen from a curated set of dyslexia-friendly combinations (not a free colour picker — keep choices bounded and pre-vetted)
 - Generate a shareable link per set
 - Save sets for reuse across students/sessions
 - View submitted results per link (which student, if named, and their final arrangement)
@@ -61,15 +58,20 @@ narrow row gutter — not a rigid grid with empty placeholder cells.
 - Freely rearrange before submitting — no penalty for changing their mind
 - Subtle animation on drag/drop/snap for a satisfying feel, without being distracting
 - Explicit "Submit" action — the arrangement isn't final until they choose to send it
-- Accessible by default: keyboard-operable drag-and-drop (not mouse/touch-only), screen-reader-friendly labelling, respects the tutor's chosen font/size/colour scheme, sufficient contrast and touch-target sizing throughout
+- Accessible by default: keyboard-operable drag-and-drop (not mouse/touch-only), screen-reader-friendly labelling, sufficient contrast and touch-target sizing throughout
 
 ## Accessibility (non-negotiable, not a nice-to-have)
 
 - Full keyboard operability for the drag-and-drop interaction (this is the hard part and shapes the tech choice — needs a library or pattern that supports keyboard reordering, not just pointer-based dragging)
 - WCAG AA at minimum as the working target
-- Dyslexia-friendly colour palettes and font choices, curated rather than freeform
-- Adjustable font size
 - Clear focus states, sensible tab order, ARIA labelling on cards and drop zones
+- Per-task font/size/colour-scheme customization was tried and removed
+  (2026-09-30 decision, do not re-add without discussion): the controls
+  didn't visibly do anything for two of the three settings, and the large
+  font size broke the fixed diamond layout. The app now ships one fixed,
+  already-accessible look (Lexend, the cream/navy Sticky Canvas palette) —
+  accessibility comes from that single design being good, not from tutor
+  configuration.
 
 ## Out of scope for v1
 

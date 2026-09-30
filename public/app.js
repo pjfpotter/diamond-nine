@@ -541,9 +541,6 @@
             titleEl.hidden = true;
           }
           if (data.instructions) instructionsEl.textContent = data.instructions;
-          document.documentElement.dataset.font = data.font || 'lexend';
-          document.documentElement.dataset.fontSize = data.font_size || 'medium';
-          document.documentElement.dataset.colourScheme = data.colour_scheme || 'cream-navy';
         } else {
           console.warn('Could not load set, falling back to demo cards');
         }

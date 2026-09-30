@@ -233,9 +233,6 @@
         const data = await res.json();
         document.getElementById('field-title').value = data.title || '';
         document.getElementById('field-instructions').value = data.instructions || '';
-        document.getElementById('field-font').value = data.font || 'lexend';
-        document.getElementById('field-font-size').value = data.font_size || 'medium';
-        document.getElementById('field-colour-scheme').value = data.colour_scheme || 'cream-navy';
         data.cards.forEach((c, i) => {
           if (cardInputs[i]) {
             cardInputs[i].text.value = c.text || '';
@@ -265,9 +262,6 @@
       const payload = {
         title: document.getElementById('field-title').value.trim(),
         instructions: document.getElementById('field-instructions').value.trim(),
-        font: document.getElementById('field-font').value,
-        font_size: document.getElementById('field-font-size').value,
-        colour_scheme: document.getElementById('field-colour-scheme').value,
         cards,
       };
 
