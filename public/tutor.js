@@ -1,11 +1,30 @@
+// Same IIFE pattern as app.js - see the comment at the top of that file
+// for why. This script runs the whole tutor-facing side of the app:
+// signing up, the dashboard, creating/editing tasks, and viewing results.
+// It's a tiny hand-rolled single-page app: one HTML file (tutor.html)
+// holds a handful of <template> elements, and this file swaps which one
+// is shown based on the URL's hash (the part after #), rather than
+// navigating to separate pages.
 (function () {
   'use strict';
 
+  // The key used to store the tutor's auth token in the browser's
+  // localStorage, so they stay "logged in" between visits without a
+  // password - see the get/set/clear helpers below.
   const TOKEN_KEY = 'diamond9_tutor_token';
 
-  const appEl = document.getElementById('app');
+  const appEl = document.getElementById('app'); // the single container everything gets rendered into
   const navEl = document.getElementById('tutor-nav');
   const liveRegionEl = document.getElementById('live-region');
+
+  // --- Auth token helpers ---
+  //
+  // There are no passwords or accounts here (see spec.md) - a tutor
+  // "logs in" by having a long random token, generated once by the server
+  // and stored in this browser's localStorage. Whoever has the token can
+  // manage the tasks it owns; it's effectively a very long, hard-to-guess
+  // password that's never typed in, just remembered by the browser (or
+  // carried in the dashboard link, see dashboardLink() below).
 
   function getToken() {
     return localStorage.getItem(TOKEN_KEY);
@@ -21,6 +40,8 @@
     route();
   }
 
+  // Same live-region announce pattern as app.js - see that file's comment
+  // on announce() for why it clears the text before setting it.
   function announce(message) {
     liveRegionEl.textContent = '';
     requestAnimationFrame(() => {
@@ -28,33 +49,59 @@
     });
   }
 
+  // A thin wrapper around fetch() that automatically attaches the tutor's
+  // token as a header on every request, so the rest of this file doesn't
+  // have to repeat that logic on every single API call. This is the same
+  // idea as an "interceptor" or "middleware" pattern you'll see in bigger
+  // HTTP client libraries.
   async function api(path, opts) {
     opts = opts || {};
+    // Object.assign merges objects together (later ones win on conflicts) -
+    // this starts from a default Content-Type header, then layers in
+    // whatever headers the caller passed, without mutating either original object.
     const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
     const token = getToken();
     if (token) headers['X-Tutor-Token'] = token;
     return fetch(path, Object.assign({}, opts, { headers }));
   }
 
+  // Empties out the app container and clones in the content of a
+  // <template> tag. <template> elements are inert (their content isn't
+  // rendered or run) until explicitly cloned into the live document like
+  // this - that's why tutor.html can define several "pages" worth of
+  // markup without them all showing at once or conflicting with each other.
   function mount(tpl) {
     appEl.innerHTML = '';
-    appEl.appendChild(tpl.content.cloneNode(true));
+    appEl.appendChild(tpl.content.cloneNode(true)); // true = deep clone (includes all children, not just the template tag itself)
   }
 
   function showNav(show) {
     navEl.hidden = !show;
   }
 
+  // The tutor's personal dashboard link, with their token baked into the
+  // URL as a query parameter - opening this link on any device logs them
+  // back in automatically (see boot() at the bottom, which reads ?token=
+  // out of the URL on first load).
   function dashboardLink() {
     return `${location.origin}${location.pathname}?token=${encodeURIComponent(getToken())}`;
   }
 
+  // SQLite stores timestamps like "2026-09-30 12:34:56" with no timezone
+  // marker - we know the server always writes these in UTC, so we turn it
+  // into a proper ISO 8601 string (with a literal "T" instead of the space,
+  // and a "Z" for UTC) that the Date constructor understands correctly.
   function formatDate(sqliteDatetime) {
     const iso = String(sqliteDatetime).replace(' ', 'T') + 'Z';
     const d = new Date(iso);
+    // If parsing somehow fails, show the raw value rather than "Invalid Date".
     return Number.isNaN(d.getTime()) ? sqliteDatetime : d.toLocaleString();
   }
 
+  // Copies text to the clipboard and gives the button that triggered it
+  // brief visual feedback ("Copied!"), then restores its original label.
+  // navigator.clipboard.writeText() can reject (e.g. if the page doesn't
+  // have clipboard permission), hence the try/catch.
   async function copyToClipboard(text, btnEl) {
     const original = btnEl.textContent;
     try {
@@ -69,13 +116,18 @@
   }
 
   // --- Views ---
+  //
+  // Each renderX() function below is a "page": it mounts the matching
+  // <template>, fills in any dynamic content, and wires up whatever
+  // buttons/forms that page needs. They're called by route() further down,
+  // based on the current URL hash.
 
   function renderWelcome() {
     mount(document.getElementById('tpl-welcome'));
-    showNav(false);
+    showNav(false); // no dashboard/nav links to show before the tutor has an account
     document.getElementById('create-space-btn').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
-      btn.disabled = true;
+      btn.disabled = true; // prevent double-clicking while the request is in flight
       const res = await api('/api/tutors', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.token) {
@@ -86,7 +138,7 @@
         return;
       }
       setToken(data.token);
-      location.hash = '#/save-link';
+      location.hash = '#/save-link'; // show them their bookmarkable link before dropping them into the dashboard
     });
   }
 
@@ -110,7 +162,7 @@
   // actually deletes; anything else re-arms the button back to normal.
   function bindDeleteButton(btn, id, title, li) {
     let armed = false;
-    let timer = null;
+    let timer = null; // holds the id returned by setTimeout, so it can be cancelled with clearTimeout
 
     btn.addEventListener('click', async () => {
       if (!armed) {
@@ -125,17 +177,22 @@
         return;
       }
 
-      clearTimeout(timer);
+      // Second click within the window: actually delete.
+      clearTimeout(timer); // stop the auto-reset timer above from firing after we've already acted
       btn.disabled = true;
       btn.textContent = 'Deleting…';
       const res = await api(`/api/sets/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        li.remove();
+        li.remove(); // remove this task's row from the list entirely
         announce(`Deleted "${title}".`);
+        // querySelector returns null if nothing matches - if there's no
+        // .task-item left anywhere on the page, the list is now empty.
         if (!document.querySelector('.task-item')) {
           document.getElementById('dashboard-empty').hidden = false;
         }
       } else {
+        // Deletion failed server-side - reset the button back to normal
+        // rather than leaving it stuck on "Deleting…".
         btn.disabled = false;
         armed = false;
         btn.textContent = 'Delete';
@@ -149,7 +206,7 @@
     showNav(true);
 
     const res = await api('/api/tutor/sets');
-    if (res.status === 401) return clearTokenAndGoWelcome();
+    if (res.status === 401) return clearTokenAndGoWelcome(); // token is invalid/expired - back to square one
     const data = await res.json();
 
     const listEl = document.getElementById('task-list');
@@ -161,6 +218,12 @@
       const li = document.createElement('li');
       li.className = 'task-item';
       const title = set.title && set.title.trim() ? set.title : 'Untitled task';
+      // innerHTML here is safe because every value we're inserting is a
+      // hard-coded literal string, not anything the tutor or student
+      // typed - the actual title text is set separately below via
+      // .textContent (never via innerHTML), which is what avoids XSS: if
+      // someone had typed HTML/script tags into a title, textContent
+      // displays it as plain visible text instead of running it.
       li.innerHTML = `
         <div>
           <div class="task-item-title"></div>
@@ -191,13 +254,17 @@
     });
   }
 
+  // Renders the create/edit form. `existingId` is null for a brand new
+  // task, or a task's id string when editing one that already exists -
+  // most of this function's logic (loading existing data, wording) branches
+  // on that.
   async function renderEditor(existingId) {
     mount(document.getElementById('tpl-editor'));
     showNav(true);
     document.getElementById('editor-heading').textContent = existingId ? 'Edit task' : 'New task';
 
     const cardFieldsEl = document.getElementById('card-fields');
-    const cardInputs = [];
+    const cardInputs = []; // keeps a reference to each card's <input> element, in order, for easy reading later
     for (let i = 0; i < 9; i += 1) {
       const row = document.createElement('div');
       row.className = 'card-field-row';
@@ -215,15 +282,21 @@
     }
 
     // Live "N / limit" guidance so a tutor can see how much room they have
-    // before they hit the server's cap, not just after.
+    // before they hit the server's cap, not just after. This is declared
+    // as a nested function (rather than at the top level) because it's
+    // only ever used here, inside renderEditor - keeping it local avoids
+    // cluttering the rest of the file with something so specific.
     function bindCharCount(inputEl, countEl, limit) {
       const update = () => {
         const len = inputEl.value.length;
         countEl.textContent = `${len} / ${limit}`;
+        // toggle's second argument sets the class on/off based on a
+        // condition, rather than flipping it - here it turns on a
+        // "getting close to the limit" red-text style once past 90%.
         countEl.classList.toggle('char-count-near-limit', len >= limit * 0.9);
       };
-      inputEl.addEventListener('input', update);
-      update();
+      inputEl.addEventListener('input', update); // fires on every keystroke/paste, not just when the field loses focus
+      update(); // also run it once immediately, so the counter is correct even before the user types anything
     }
     bindCharCount(document.getElementById('field-title'), document.getElementById('title-char-count'), 200);
     bindCharCount(document.getElementById('field-instructions'), document.getElementById('instructions-char-count'), 1000);
@@ -231,6 +304,7 @@
     let currentId = existingId || null;
 
     if (existingId) {
+      // Editing an existing task: fetch its current data and pre-fill the form.
       const res = await fetch(`/api/sets/${existingId}`);
       if (res.ok) {
         const data = await res.json();
@@ -241,6 +315,11 @@
             cardInputs[i].text.value = c.text || '';
           }
         });
+        // Setting .value directly (above) doesn't fire an 'input' event,
+        // so the char counters wouldn't know to update themselves -
+        // dispatching a synthetic Event('input') tells their listeners
+        // "something changed, recalculate", even though no real typing
+        // happened.
         document.getElementById('field-title').dispatchEvent(new Event('input'));
         document.getElementById('field-instructions').dispatchEvent(new Event('input'));
         showShareBlock(currentId);
@@ -248,7 +327,7 @@
     }
 
     document.getElementById('task-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
+      e.preventDefault(); // stop the browser's default full-page-reload form submission
       const errorEl = document.getElementById('editor-error');
       const statusEl = document.getElementById('editor-status');
       errorEl.hidden = true;
@@ -269,6 +348,8 @@
       };
 
       statusEl.textContent = 'Saving…';
+      // Same endpoint shape either way, just PUT (update) vs POST (create)
+      // depending on whether this task already has an id.
       const res = currentId
         ? await api(`/api/sets/${currentId}`, { method: 'PUT', body: JSON.stringify(payload) })
         : await api('/api/sets', { method: 'POST', body: JSON.stringify(payload) });
@@ -282,6 +363,11 @@
       }
 
       if (!currentId) {
+        // This was a brand-new task - the server just gave it an id.
+        // Update the URL to point at .../edit/<id> without a full page
+        // navigation (history.replaceState swaps the URL silently), so
+        // reloading the page afterwards keeps editing the same task
+        // instead of creating a second one.
         const data = await res.json();
         currentId = data.id;
         history.replaceState(null, '', `#/edit/${currentId}`);
@@ -293,6 +379,9 @@
     });
   }
 
+  // Reveals the "here's your student link" panel at the bottom of the
+  // editor, once a task has been saved at least once (so it has an id to
+  // build a link from).
   function showShareBlock(id) {
     const block = document.getElementById('share-block');
     block.hidden = false;
@@ -306,6 +395,10 @@
     mount(document.getElementById('tpl-results'));
     showNav(true);
 
+    // Promise.all runs both requests at the same time rather than one
+    // after the other, and waits for both to finish before continuing -
+    // faster than two separate awaits in sequence, since they don't
+    // depend on each other's result.
     const [setRes, resultsRes] = await Promise.all([
       fetch(`/api/sets/${id}`),
       api(`/api/sets/${id}/results`),
@@ -344,13 +437,19 @@
       const ol = document.createElement('ol');
       ol.className = 'result-order';
       for (let i = 0; i < 9; i += 1) {
+        // A result's arrangement is stored as {"0": "card-3", "1": null, ...}
+        // - object keys are always strings, so we look it up with
+        // String(i) even though i itself is a number.
         const cardId = r.arrangement[String(i)];
         const li = document.createElement('li');
         if (cardId) {
+          // Card ids from app.js look like "card-3" - splitting on '-' and
+          // taking the second half recovers the original array index into
+          // setData.cards, which is how we turn the id back into its text.
           const idx = Number(String(cardId).split('-')[1]);
           li.textContent = setData.cards[idx] ? setData.cards[idx].text : '(unknown card)';
         } else {
-          li.textContent = '(empty)';
+          li.textContent = '(empty)'; // the student left this position unfilled
         }
         ol.appendChild(li);
       }
@@ -360,30 +459,46 @@
   }
 
   // --- Router ---
+  //
+  // This app has no server-rendered pages beyond the one tutor.html file -
+  // everything after the # is handled entirely in the browser. route()
+  // looks at the current hash and decides which view function to call.
+  // Using the URL hash (rather than, say, a plain in-memory variable)
+  // means the browser's back/forward buttons and bookmarks/shared links
+  // all work naturally, without any extra code.
 
   function route() {
     const hash = location.hash || '#/';
     const token = getToken();
 
-    if (!token) return renderWelcome();
+    if (!token) return renderWelcome(); // not logged in - nothing else matters until they create a tutor space
     if (hash === '#/save-link') return renderSaveLink();
     if (hash === '#/new') return renderEditor(null);
 
+    // .match() against a regular expression: ^#\/edit\/(.+)$ means "the
+    // whole string, starting with #/edit/, followed by one-or-more
+    // characters" - the parentheses capture that trailing part (the task
+    // id) so it can be pulled out as editMatch[1].
     const editMatch = hash.match(/^#\/edit\/(.+)$/);
     if (editMatch) return renderEditor(decodeURIComponent(editMatch[1]));
 
     const resultsMatch = hash.match(/^#\/results\/(.+)$/);
     if (resultsMatch) return renderResults(decodeURIComponent(resultsMatch[1]));
 
-    return renderDashboard();
+    return renderDashboard(); // default: logged in, no specific route matched
   }
 
+  // Whenever the URL's hash changes - including via the back/forward
+  // buttons, not just our own code setting location.hash - re-run the router.
   window.addEventListener('hashchange', route);
 
   function boot() {
     const params = new URLSearchParams(location.search);
     const urlToken = params.get('token');
     if (urlToken) {
+      // Someone opened their saved dashboard link (?token=...) - log them
+      // in using that token instead of whatever (if anything) is already
+      // in localStorage.
       setToken(urlToken);
       // Strip the token from the visible URL so it isn't left in browser
       // history or accidentally shared if the tab URL gets copied.
