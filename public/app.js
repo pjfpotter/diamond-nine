@@ -155,8 +155,9 @@
       el.style.transform = `translate(${dx}px, ${dy}px)`;
       requestAnimationFrame(() => {
         // A slight overshoot-then-settle easing makes the drop feel decisive
-        // rather than just gliding to a stop.
-        el.style.transition = 'transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        // rather than just gliding to a stop - kept subtle, same motion
+        // shape as the pick-up but a much smaller overshoot.
+        el.style.transition = 'transform 0.24s cubic-bezier(0.3, 1.1, 0.6, 1)';
         el.style.transform = '';
       });
     });

@@ -153,6 +153,25 @@ button {
   padding: 0.4rem 0.8rem;
 }
 
+.link-btn-inline {
+  display: inline-block;
+  width: auto;
+  margin-top: 0.35rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent, #1c4e80);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-btn-inline:hover {
+  background: none;
+  color: var(--ink);
+}
+
 /* --- Editor --- */
 
 .field {
@@ -181,6 +200,23 @@ button {
 
 .field textarea {
   resize: vertical;
+}
+
+.char-count {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted-ink);
+  text-align: right;
+}
+
+.char-count.char-count-near-limit {
+  color: #b3261e;
+}
+
+.card-length-hint {
+  margin: -0.2rem 0 0.7rem;
+  font-size: 0.8rem;
 }
 
 .field select {
@@ -262,15 +298,6 @@ button {
 .card-field-text {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.card-field-image {
-  flex: 0 0 11rem;
-  min-width: 0;
-}
-
-.card-field-image::placeholder {
-  color: #b7b2a3;
 }
 
 .error-text {

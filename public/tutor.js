@@ -165,6 +165,7 @@
         <div>
           <div class="task-item-title"></div>
           <div class="task-item-meta"></div>
+          <button type="button" class="link-btn-inline copy-link-btn">Copy student link</button>
         </div>
         <div class="task-item-actions">
           <a href="#/edit/${encodeURIComponent(set.id)}">Edit</a>
@@ -174,6 +175,10 @@
       `;
       li.querySelector('.task-item-title').textContent = title;
       li.querySelector('.task-item-meta').textContent = `Updated ${formatDate(set.updated_at)}`;
+      const studentLink = `${location.origin}/index.html?set=${encodeURIComponent(set.id)}`;
+      li.querySelector('.copy-link-btn').addEventListener('click', (e) => {
+        copyToClipboard(studentLink, e.currentTarget);
+      });
       bindDeleteButton(li.querySelector('.delete-task-btn'), set.id, title, li);
       listEl.appendChild(li);
     });
@@ -199,14 +204,26 @@
       row.innerHTML = `
         <span class="card-field-number">${i + 1}.</span>
         <input type="text" class="card-field-text" placeholder="Card text" maxlength="500" aria-label="Card ${i + 1} text" required />
-        <input type="text" class="card-field-image" placeholder="Image URL (optional)" aria-label="Card ${i + 1} image URL (optional)" />
       `;
       cardFieldsEl.appendChild(row);
       cardInputs.push({
         text: row.querySelector('.card-field-text'),
-        image: row.querySelector('.card-field-image'),
       });
     }
+
+    // Live "N / limit" guidance so a tutor can see how much room they have
+    // before they hit the server's cap, not just after.
+    function bindCharCount(inputEl, countEl, limit) {
+      const update = () => {
+        const len = inputEl.value.length;
+        countEl.textContent = `${len} / ${limit}`;
+        countEl.classList.toggle('char-count-near-limit', len >= limit * 0.9);
+      };
+      inputEl.addEventListener('input', update);
+      update();
+    }
+    bindCharCount(document.getElementById('field-title'), document.getElementById('title-char-count'), 200);
+    bindCharCount(document.getElementById('field-instructions'), document.getElementById('instructions-char-count'), 1000);
 
     let currentId = existingId || null;
 
@@ -222,9 +239,10 @@
         data.cards.forEach((c, i) => {
           if (cardInputs[i]) {
             cardInputs[i].text.value = c.text || '';
-            cardInputs[i].image.value = c.image_url || '';
           }
         });
+        document.getElementById('field-title').dispatchEvent(new Event('input'));
+        document.getElementById('field-instructions').dispatchEvent(new Event('input'));
         showShareBlock(currentId);
       }
     }
@@ -237,7 +255,6 @@
 
       const cards = cardInputs.map((c) => ({
         text: c.text.value.trim(),
-        image_url: c.image.value.trim(),
       }));
       if (cards.some((c) => !c.text)) {
         errorEl.textContent = 'Every card needs text.';

@@ -63,19 +63,6 @@ function newId() {
   return crypto.randomBytes(9).toString('base64url');
 }
 
-// Only http(s) image URLs are ever stored or rendered — blocks javascript:,
-// data:, file:, etc. from sneaking into a card via the image field.
-function isSafeImageUrl(value) {
-  if (typeof value !== 'string' || value.trim() === '') return true; // optional field
-  if (value.length > 2000) return false;
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 // Generic bounded-length string check, used for the free-text fields that
 // don't have their own dedicated validator.
 function validateTextLength(value, maxLen, label) {
@@ -85,14 +72,12 @@ function validateTextLength(value, maxLen, label) {
   return null;
 }
 
-// Cards are stored/returned as exactly {text, image_url} - any other
-// attacker-supplied fields on a card object are dropped rather than stored
-// or echoed back verbatim.
+// Cards are stored/returned as exactly {text} - any other attacker-supplied
+// fields on a card object are dropped rather than stored or echoed back
+// verbatim. (Cards used to also carry an optional image_url; the image
+// feature was removed as a deliberate design decision - see spec.md.)
 function sanitizeCards(cards) {
-  return cards.map((c) => ({
-    text: c.text,
-    image_url: typeof c.image_url === 'string' ? c.image_url : '',
-  }));
+  return cards.map((c) => ({ text: c.text }));
 }
 
 // A student's arrangement is a small, fixed-shape object: at most the nine
@@ -135,7 +120,6 @@ function validateCards(cards) {
     if (!card || typeof card !== 'object') return `card ${i} is invalid`;
     if (typeof card.text !== 'string') return `card ${i} is missing text`;
     if (card.text.length > 500) return `card ${i} text is too long`;
-    if (!isSafeImageUrl(card.image_url)) return `card ${i} has an invalid image URL (only http/https allowed)`;
   }
   return null;
 }
@@ -168,7 +152,7 @@ app.post('/api/sets', requireTutor, (req, res) => {
   const { title = '', instructions = '', font, font_size, colour_scheme, cards } = req.body || {};
   const error =
     validateTextLength(title, 200, 'title') ||
-    validateTextLength(instructions, 2000, 'instructions') ||
+    validateTextLength(instructions, 1000, 'instructions') ||
     validateCards(cards) ||
     validateChoice(font, ALLOWED_FONTS, 'font') ||
     validateChoice(font_size, ALLOWED_FONT_SIZES, 'font_size') ||
@@ -205,7 +189,7 @@ app.put('/api/sets/:id', requireTutor, (req, res) => {
   const { title = '', instructions = '', font, font_size, colour_scheme, cards } = req.body || {};
   const error =
     validateTextLength(title, 200, 'title') ||
-    validateTextLength(instructions, 2000, 'instructions') ||
+    validateTextLength(instructions, 1000, 'instructions') ||
     validateCards(cards) ||
     validateChoice(font, ALLOWED_FONTS, 'font') ||
     validateChoice(font_size, ALLOWED_FONT_SIZES, 'font_size') ||

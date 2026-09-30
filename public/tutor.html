@@ -70,15 +70,18 @@
         <label class="field">
           <span>Title <span class="muted">(optional — leave blank to show none)</span></span>
           <input type="text" id="field-title" maxlength="200" />
+          <span class="char-count" id="title-char-count">0 / 200</span>
         </label>
 
         <label class="field">
           <span>Instructions <span class="muted">(optional)</span></span>
           <textarea id="field-instructions" rows="3" maxlength="1000"></textarea>
+          <span class="char-count" id="instructions-char-count">0 / 1000</span>
         </label>
 
         <fieldset class="cards-fieldset">
           <legend>Nine cards</legend>
+          <p class="muted card-length-hint">Keep each one short and scannable — up to 500 characters, but a sentence or less reads best in the diamond.</p>
           <div id="card-fields" class="card-fields"></div>
         </fieldset>
 

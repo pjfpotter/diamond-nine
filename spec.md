@@ -29,7 +29,10 @@ Known failure mode: it gets stale with overuse, so this tool should be quick to 
     on screen at all; if left blank, the student view shows no title rather
     than a generic placeholder standing in for it.
   - Instructions text (the prompt/question framing the sort)
-  - Nine cards, each with text and an optional image
+  - Nine cards, text only (up to 500 characters each). Images were
+    considered and deliberately dropped (2026-09-30 decision, do not
+    re-add without discussion): they don't suit the sticky-note visual
+    design, and aren't typically used in real diamond nine tasks anyway.
   - Font choice from a curated list of accessible fonts
   - Font size setting
   - Colour scheme chosen from a curated set of dyslexia-friendly combinations (not a free colour picker — keep choices bounded and pre-vetted)
@@ -71,7 +74,7 @@ narrow row gutter — not a rigid grid with empty placeholder cells.
 ## Out of scope for v1
 
 - Analytics/reporting beyond viewing one student's result at a time
-- Image upload hosting — start with image URL field, revisit if it needs real uploads
+- Images on cards at all (dropped entirely, see Tutor-side features above)
 - Live collaborative mode (see its own section below) — a real future phase, not something to fold into the current async model incidentally
 
 ## Live collaborative mode (scoped future phase, not current v1)

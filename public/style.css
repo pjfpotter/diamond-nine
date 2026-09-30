@@ -304,13 +304,17 @@ body.picking .pool {
   overflow: hidden;
 }
 
-.diamond .card:hover,
-.diamond .card:focus-visible {
-  display: flex;
+/* Magnify in place on hover/focus - anchored to the same top-left corner
+   the card already occupies (not centered/translated), so it grows without
+   appearing to jump anywhere. Excludes .picked-up: without this, a card
+   picked up by click/tap while the cursor still rests on it would take on
+   this rule's size/position instead of the picked-up lift, since this
+   selector is more specific. */
+.diamond .card:hover:not(.picked-up),
+.diamond .card:focus-visible:not(.picked-up) {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) !important;
+  top: 0;
+  left: 0;
   width: 12rem;
   height: auto;
   min-height: 100%;
@@ -321,8 +325,8 @@ body.picking .pool {
   box-shadow: 0 16px 32px rgba(34, 38, 43, 0.3);
 }
 
-.diamond .card:hover .card-text,
-.diamond .card:focus-visible .card-text {
+.diamond .card:hover:not(.picked-up) .card-text,
+.diamond .card:focus-visible:not(.picked-up) .card-text {
   display: block;
   -webkit-line-clamp: unset;
   overflow: visible;
