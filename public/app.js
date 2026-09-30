@@ -55,6 +55,10 @@
   let pickedUpCardId = null;
   // After a keyboard/tap-triggered move, render() should refocus this card.
   let pendingFocusCardId = null;
+  // The card just moved into a slot by the current moveCard() call, so its
+  // freshly-created element can swallow the "born under the cursor" enter
+  // event once (see makeCardEl's mouseenter handling) instead of magnifying.
+  let justMovedCardId = null;
 
   function initState() {
     slotAssignment = new Array(9).fill(null);
@@ -108,6 +112,27 @@
     textEl.textContent = card.text;
     el.appendChild(textEl);
     if (card.id === pickedUpCardId) el.classList.add('picked-up');
+    // Magnify-on-hover is driven from mouseenter/leave rather than CSS
+    // :hover, because a freshly dropped card sits right under the cursor -
+    // and browsers re-run hit-testing after a DOM mutation and fire a
+    // mouseenter for whatever now sits under an unmoved cursor, so even a
+    // JS listener sees an "enter" the instant the card is born. We want
+    // that specific first enter (right after a drop) to do nothing, and
+    // only a later, real enter (mouse actually left and came back) to
+    // magnify - so the just-moved card is marked to swallow exactly one
+    // enter event before behaving normally.
+    let suppressNextEnter = card.id === justMovedCardId;
+    el.addEventListener('mouseenter', () => {
+      if (!el.closest('.slot')) return;
+      if (suppressNextEnter) {
+        suppressNextEnter = false;
+        return;
+      }
+      el.classList.add('magnify');
+    });
+    el.addEventListener('mouseleave', () => {
+      el.classList.remove('magnify');
+    });
     return el;
   }
 
@@ -142,6 +167,8 @@
       poolEl.appendChild(makeCardEl(cardById(cardId)));
     });
 
+    justMovedCardId = null;
+
     // FLIP: for any card whose position changed, animate from old to new.
     document.querySelectorAll('.card').forEach((el) => {
       const before = existingRects.get(el.dataset.cardId);
@@ -154,10 +181,10 @@
       el.style.transition = 'none';
       el.style.transform = `translate(${dx}px, ${dy}px)`;
       requestAnimationFrame(() => {
-        // A slight overshoot-then-settle easing makes the drop feel decisive
-        // rather than just gliding to a stop - kept subtle, same motion
-        // shape as the pick-up but a much smaller overshoot.
-        el.style.transition = 'transform 0.24s cubic-bezier(0.3, 1.1, 0.6, 1)';
+        // Plain ease-out, no overshoot - the card should arrive and stop,
+        // not fly past its target and correct back (that read as the
+        // "flies left then snaps back" motion users found confusing).
+        el.style.transition = 'transform 0.2s ease-out';
         el.style.transform = '';
       });
     });
@@ -216,6 +243,7 @@
       }
     }
 
+    justMovedCardId = target !== 'pool' ? cardId : null;
     render();
   }
 

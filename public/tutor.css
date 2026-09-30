@@ -272,6 +272,12 @@ button {
   min-width: 0;
 }
 
+.card-field-char-count {
+  flex: 0 0 auto;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
 .error-text {
   color: #b3261e;
   font-size: 0.85rem;

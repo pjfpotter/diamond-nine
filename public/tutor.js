@@ -203,11 +203,14 @@
       row.className = 'card-field-row';
       row.innerHTML = `
         <span class="card-field-number">${i + 1}.</span>
-        <input type="text" class="card-field-text" placeholder="Card text" maxlength="500" aria-label="Card ${i + 1} text" required />
+        <input type="text" class="card-field-text" placeholder="Card text" maxlength="120" aria-label="Card ${i + 1} text" required />
+        <span class="char-count card-field-char-count">0 / 120</span>
       `;
       cardFieldsEl.appendChild(row);
+      const textInput = row.querySelector('.card-field-text');
+      bindCharCount(textInput, row.querySelector('.card-field-char-count'), 120);
       cardInputs.push({
-        text: row.querySelector('.card-field-text'),
+        text: textInput,
       });
     }
 

@@ -265,17 +265,21 @@ body.picking .pool {
 .diamond .card-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 5;
   overflow: hidden;
 }
 
 /* Magnify in place on hover/focus - anchored to the same top-left corner
    the card already occupies (not centered/translated), so it grows without
-   appearing to jump anywhere. Excludes .picked-up: without this, a card
-   picked up by click/tap while the cursor still rests on it would take on
-   this rule's size/position instead of the picked-up lift, since this
-   selector is more specific. */
-.diamond .card:hover:not(.picked-up),
+   appearing to jump anywhere. The hover trigger is the JS-managed .magnify
+   class (see app.js), not :hover directly - a freshly dropped card sits
+   right under the cursor and :hover would fire on it immediately, which
+   read as "the drop shadow/rotation is stuck"; .magnify only gets added on
+   a real mouseenter. Excludes .picked-up: without this, a card picked up
+   by click/tap while the cursor still rests on it would take on this
+   rule's size/position instead of the picked-up lift, since this selector
+   is more specific. */
+.diamond .card.magnify:not(.picked-up),
 .diamond .card:focus-visible:not(.picked-up) {
   position: absolute;
   top: 0;
@@ -290,7 +294,7 @@ body.picking .pool {
   box-shadow: 0 16px 32px rgba(34, 38, 43, 0.3);
 }
 
-.diamond .card:hover:not(.picked-up) .card-text,
+.diamond .card.magnify:not(.picked-up) .card-text,
 .diamond .card:focus-visible:not(.picked-up) .card-text {
   display: block;
   -webkit-line-clamp: unset;
