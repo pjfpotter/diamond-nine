@@ -226,6 +226,7 @@ body.picking .pool {
 
 .card-text {
   display: block;
+  overflow-wrap: break-word;
 }
 
 .card-coral { background: var(--coral); }
@@ -260,6 +261,11 @@ body.picking .pool {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
   overflow: hidden;
+  /* .diamond .card is a flex container, and a flex item's default
+     min-width is auto (its content size) - without overriding that, the
+     text refuses to shrink/wrap below its longest unbroken run and
+     overflows the card instead, regardless of overflow-wrap. */
+  min-width: 0;
 }
 
 /* Magnify in place on hover/focus - anchored to the same top-left corner
