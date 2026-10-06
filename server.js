@@ -56,7 +56,15 @@ const app = express();
 // Express "middleware" runs on every incoming request, in the order
 // they're registered, before it reaches a specific route handler below.
 app.use(express.json({ limit: '256kb' })); // parses JSON request bodies into req.body; rejects anything bigger than 256kb outright
-app.use(express.static(path.join(__dirname, 'public'))); // serves index.html, tutor.html, app.js, style.css etc. directly as files
+// Serves every file in public/ directly - app.js, style.css, etc. The
+// `index` override is the one deliberate exception: a bare "/" serves
+// tutor.html rather than express.static's own default of index.html.
+// The root URL is never something handed to a student - they always get
+// a specific link (the async set link, or the live room link) - so it
+// makes more sense for whoever visits the bare root (the tutor) to land
+// on their dashboard. index.html (the student board) is completely
+// unaffected and still serves normally at its own explicit path.
+app.use(express.static(path.join(__dirname, 'public'), { index: 'tutor.html' }));
 
 // Minimal in-memory per-IP rate limiter (no extra dependency) for the two
 // unauthenticated-write endpoints most exposed to spam: minting tutor
