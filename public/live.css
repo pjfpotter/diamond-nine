@@ -73,6 +73,12 @@
   width: 100%;
 }
 
+.host-controls-hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .host-controls-actions .danger {
   background: #fdecea;
   color: #b3261e;

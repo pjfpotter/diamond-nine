@@ -608,11 +608,11 @@
   endBtn.addEventListener('click', () => {
     if (!endArmed) {
       endArmed = true;
-      endBtn.textContent = 'Really end?';
+      endBtn.textContent = 'Really submit & end?';
       endBtn.classList.add('danger');
       endArmTimer = setTimeout(() => {
         endArmed = false;
-        endBtn.textContent = 'End session';
+        endBtn.textContent = 'Submit & end session';
         endBtn.classList.remove('danger');
       }, 4000);
       return;
