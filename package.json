@@ -10,5 +10,8 @@
   "dependencies": {
     "better-sqlite3": "^11.3.0",
     "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "partykit": "^0.0.115"
   }
 }

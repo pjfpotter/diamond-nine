@@ -1,0 +1,73 @@
+<!doctype html>
+<!--
+  STAGE 1 THROWAWAY DEMO - see spec.md's "Live collaborative mode" section.
+  This is not part of the real app (nothing in public/ links to it, and
+  Express never serves this folder) - it's just a page to open directly in
+  a browser (double-click index.html, or File > Open) to prove PartyKit's
+  local dev server actually works before writing any real diamond-nine
+  sync code on top of it.
+
+  How to use this file:
+    1. In a terminal, in the project root, run: npx partykit dev
+    2. Open this index.html file directly in TWO browser tabs
+    3. Click "+1" in either tab - the number should update in BOTH tabs
+       within a second, proving messages really are flowing through
+       PartyKit's server and back out to every connected tab.
+  Delete this whole party-demo/ folder once that's confirmed working.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PartyKit plumbing demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-top: 4rem; }
+    #count { font-size: 4rem; font-weight: bold; }
+    #status { color: #666; font-size: 0.9rem; }
+    button { font-size: 1.2rem; padding: 0.5rem 1.5rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <p id="status">Connecting…</p>
+  <div id="count">0</div>
+  <button id="increment-btn" disabled>+1</button>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const countEl = document.getElementById('count');
+    const btn = document.getElementById('increment-btn');
+
+    // "demo-room" is a hardcoded room id, just for this throwaway test -
+    // every tab that connects to this same room id ends up talking to the
+    // same Server instance (party/server.js), which is what makes the
+    // count shared instead of per-tab. The real feature will generate a
+    // fresh, unique room id per live diamond-nine session instead of a
+    // fixed string like this.
+    const ws = new WebSocket('ws://127.0.0.1:1999/party/demo-room');
+
+    ws.addEventListener('open', () => {
+      statusEl.textContent = 'Connected';
+      btn.disabled = false;
+    });
+
+    ws.addEventListener('close', () => {
+      statusEl.textContent = 'Disconnected (is "npx partykit dev" still running?)';
+      btn.disabled = true;
+    });
+
+    // This is the whole sync mechanism: whenever the server broadcasts a
+    // new count (to every connected tab, including whichever one clicked
+    // the button), update what's on screen. No tab ever guesses its own
+    // next number - it only ever displays what the server told it.
+    ws.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'count') {
+        countEl.textContent = data.value;
+      }
+    });
+
+    btn.addEventListener('click', () => {
+      ws.send(JSON.stringify({ type: 'increment' }));
+    });
+  </script>
+</body>
+</html>
