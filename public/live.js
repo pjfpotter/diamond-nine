@@ -627,7 +627,7 @@
   // both places without an env file the static frontend could read.
   const LIVE_SERVER_HOST = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
     ? '127.0.0.1:8787'
-    : 'diamond-nine-live.YOUR-SUBDOMAIN.workers.dev';
+    : 'diamond-nine-live.pjpotter.workers.dev';
   const LIVE_SERVER_PROTOCOL = location.protocol === 'https:' ? 'wss:' : 'ws:';
 
   function connect() {
