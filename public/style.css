@@ -81,12 +81,24 @@ body {
 
 .diamond-area {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  /* Previously `inset: 0` (full viewport), which centered the diamond
+     without any awareness of .pool-panel (15rem wide, 1.5rem from the
+     left) or .info-panel (17rem wide, 1.5rem from the right) - both
+     float over this same full-viewport layer rather than taking up
+     their own flow space. The diamond stayed dead-centered as the window
+     narrowed until it ran straight into a panel, with almost no warning
+     before the "too small" breakpoint below. These insets reserve each
+     panel's real width plus a 1.5rem gap, so the diamond centers in the
+     space actually left over instead of the whole viewport. */
+  left: 18rem; /* 1.5rem + 15rem (pool-panel) + 1.5rem gap */
+  right: 20rem; /* 1.5rem + 17rem (info-panel) + 1.5rem gap */
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Full-viewport wrapper used only to center .diamond; it must not swallow
-     clicks/drags meant for the pool or info panel that visually overlap it. */
+  /* Still must not swallow clicks/drags meant for the pool or info panel
+     that visually overlap this layer at its very edges. */
   pointer-events: none;
 }
 
@@ -400,7 +412,14 @@ button:focus-visible {
   display: none;
 }
 
-@media (max-width: 899px) {
+@media (max-width: 991px) {
+  /* Raised from 899px alongside .diamond-area's new left/right insets
+     above: those insets reserve 38rem (608px) total for the two side
+     panels, and the diamond itself needs roughly 21rem (336px) at minimum
+     to lay out its three-wide middle row without crowding - so anything
+     narrower than about 59rem (944px) of space for the diamond starts
+     squeezing it back toward the panels again. 991px (a common "tablet"
+     breakpoint) gives a clean round number with margin above that math. */
   .layout,
   #live-region,
   #confirm-modal {
