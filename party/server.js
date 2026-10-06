@@ -17,12 +17,14 @@
 // three already exist and are already tested - there's no reason for this
 // file to keep its own copy of that logic.
 //
-// NOTE: this hardcodes the Express app's local dev address. Once this is
-// actually deployed (PartyKit's servers, talking to wherever the real
-// Express app ends up hosted), this needs to become a real configured
-// URL instead - flagged here deliberately rather than solved now, since
-// it depends on hosting decisions not yet made.
-const API_BASE = 'http://localhost:3000';
+// Which Express app to talk to - comes from PartyKit's own environment
+// variable mechanism (room.env, set via partykit.json's "vars" below, or
+// overridden per-deploy with `--var API_BASE=...`) rather than a hardcoded
+// string, specifically so the exact same committed code talks to
+// localhost for `npx partykit dev` and to the real deployed app for
+// `npx partykit deploy` - nobody has to remember to edit this file (and
+// risk committing the wrong address) before either one.
+const DEFAULT_API_BASE = 'http://localhost:3000';
 
 // Cost-abuse defenses. A Durable Object is billed by connection-time and
 // message volume, so the two shapes worth defending against are: a single
@@ -39,6 +41,7 @@ const MAX_MESSAGES_PER_WINDOW = 30; // well above legitimate traffic (drag-move 
 export default class Server {
   constructor(room) {
     this.room = room;
+    this.apiBase = room.env.API_BASE || DEFAULT_API_BASE;
     this.title = '';
     this.instructions = '';
     this.cards = [];
@@ -100,7 +103,7 @@ export default class Server {
 
   async load() {
     try {
-      const res = await fetch(`${API_BASE}/api/sets/${encodeURIComponent(this.room.id)}`);
+      const res = await fetch(`${this.apiBase}/api/sets/${encodeURIComponent(this.room.id)}`);
       if (res.ok) {
         const data = await res.json();
         this.title = data.title || '';
@@ -254,7 +257,7 @@ export default class Server {
   async verifyTutor(token) {
     if (!token) return false;
     try {
-      const res = await fetch(`${API_BASE}/api/tutor/sets`, {
+      const res = await fetch(`${this.apiBase}/api/tutor/sets`, {
         headers: { 'X-Tutor-Token': token },
       });
       return res.ok;
@@ -294,7 +297,7 @@ export default class Server {
     const studentName = (names.length ? names.join(', ') : 'Live group session').slice(0, 200);
 
     try {
-      const res = await fetch(`${API_BASE}/api/sets/${encodeURIComponent(this.room.id)}/results`, {
+      const res = await fetch(`${this.apiBase}/api/sets/${encodeURIComponent(this.room.id)}/results`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ student_name: studentName, arrangement }),
