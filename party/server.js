@@ -1,49 +1,111 @@
-// STAGE 1 THROWAWAY DEMO - see spec.md's "Live collaborative mode" section,
-// build order step 1 ("prove the plumbing"). This file is not the real
-// diamond-nine sync logic yet - it's the smallest possible thing that
-// proves PartyKit actually works end to end (a shared counter, synced
-// across however many browser tabs connect to the same room), before any
-// app-specific code is written on top of it. Safe to delete once that's
-// confirmed and Stage 2 (the real board state) replaces it.
+// STAGE 2: the real diamond-nine board, shared live across every browser
+// connected to the same room. See spec.md's "Live collaborative mode"
+// section for the full design - this file implements one room's worth of
+// shared state: which card sits in which of the 9 diamond slots, and
+// which cards are still in the pool.
 //
-// This is a "Party Server": PartyKit creates one of these per room (a
-// room = one isolated, independent slice of state - for the real feature
-// this will be one live diamond-nine session; here it's just one counter).
-// Everyone who connects with the same room id in the URL ends up talking
-// to the *same* instance of this class.
+// The key idea carried over from the Stage 1 counter demo: no connected
+// browser ever trusts its own guess about what just happened. A browser
+// sends "I want to move this card here", the server is the one and only
+// place that actually updates the shared state, and then it broadcasts
+// the new state to everyone (including whoever just moved a card) - so
+// every screen is always showing a copy of what the server says is true,
+// never a locally-guessed value. This is also what makes "last write
+// wins" work for free: PartyKit delivers one room's messages to this
+// class one at a time, in the order they arrive, so if two browsers move
+// a card at nearly the same instant, the server simply processes one
+// move and then the other - there's no real race to resolve.
+
+// Placeholder cards for this build stage - Stage 3 (per spec.md's build
+// order) is what wires this up to a tutor's real saved task instead of a
+// fixed demo set.
+const DEMO_CARDS = [
+  { id: 'c1', text: 'Everyone should get the same reward regardless of effort' },
+  { id: 'c2', text: 'Rules should always be followed, no exceptions' },
+  { id: 'c3', text: 'Honesty matters more than sparing someone’s feelings' },
+  { id: 'c4', text: 'The needs of the group outweigh the needs of one person' },
+  { id: 'c5', text: 'People deserve a second chance after a mistake' },
+  { id: 'c6', text: 'Some traditions should change even if they’re old' },
+  { id: 'c7', text: 'It’s fair to treat people differently based on need' },
+  { id: 'c8', text: 'Freedom of choice matters more than following advice' },
+  { id: 'c9', text: 'Standing up for what’s right is worth the cost' },
+];
+
 export default class Server {
-  // `room` is provided by PartyKit itself - it's how this code sends
-  // messages out to connected browsers (room.broadcast) and reads the
-  // room's own id.
   constructor(room) {
     this.room = room;
-    // This lives only in memory, only for as long as the room exists (it
-    // resets to 0 the next time everyone disconnects and a fresh room
-    // starts) - there's no database involved in this demo at all.
-    this.count = 0;
+    this.cards = DEMO_CARDS;
+    // slotAssignment[i] = cardId currently in diamond slot i, or null -
+    // same shape as app.js's own slotAssignment, deliberately, since the
+    // two are the same concept (one lives in one browser only, this one
+    // lives on the server and is shared by everyone in the room).
+    this.slotAssignment = new Array(9).fill(null);
+    this.pool = this.cards.map((c) => c.id);
   }
 
-  // Runs once for each new browser tab that connects. We immediately send
-  // it the current count, so a tab joining partway through still sees the
-  // right number rather than starting blank.
+  // Bundles up everything a browser needs to redraw the whole board, in
+  // one object - used both for the very first message a new connection
+  // gets, and for every broadcast after a move.
+  currentState() {
+    return {
+      type: 'state',
+      cards: this.cards,
+      slotAssignment: this.slotAssignment,
+      pool: this.pool,
+    };
+  }
+
+  // A new browser tab just opened a connection to this room. Send it the
+  // current state immediately, so it can draw the board right away rather
+  // than starting blank - this is also exactly what happens on
+  // reconnection after a dropped connection (see spec.md: "Reconnection
+  // just refetches current state").
   onConnect(connection) {
-    connection.send(JSON.stringify({ type: 'count', value: this.count }));
+    connection.send(JSON.stringify(this.currentState()));
   }
 
-  // Runs whenever any connected tab sends a message. In this demo there's
-  // only one kind of message a tab can send: "increment".
   onMessage(message, sender) {
     const data = JSON.parse(message);
-    if (data.type === 'increment') {
-      this.count += 1;
-      // broadcast() sends to *every* connected tab, including the one
-      // that triggered the change - this is deliberate and important: it
-      // means every tab's on-screen number comes from the server's one
-      // shared value, not from each tab guessing "I clicked, so it must
-      // be N+1 now" locally. That's the same principle the real feature
-      // relies on for last-write-wins: nobody trusts their own guess,
-      // everyone displays whatever the server says actually happened.
-      this.room.broadcast(JSON.stringify({ type: 'count', value: this.count }));
+    if (data.type === 'move') {
+      this.handleMove(data.cardId, data.target);
     }
+  }
+
+  // Mirrors app.js's own moveCard() logic closely on purpose - same
+  // swap-on-collision behaviour, same shapes of data - just operating on
+  // the server's shared copy of the state instead of one browser's local
+  // copy. `target` is either a slot index 0-8, or the string 'pool'.
+  handleMove(cardId, target) {
+    const fromSlot = this.slotAssignment.indexOf(cardId);
+    const fromPool = this.pool.includes(cardId);
+
+    let displaced = null;
+    if (target === 'pool') {
+      displaced = null;
+    } else {
+      displaced = this.slotAssignment[target];
+      if (displaced === cardId) return; // dropped on itself, nothing actually changes
+    }
+
+    if (fromSlot !== -1) this.slotAssignment[fromSlot] = null;
+    if (fromPool) this.pool = this.pool.filter((id) => id !== cardId);
+
+    if (target === 'pool') {
+      this.pool.push(cardId);
+    } else {
+      this.slotAssignment[target] = cardId;
+      if (displaced) {
+        if (fromSlot !== -1) {
+          this.slotAssignment[fromSlot] = displaced;
+        } else {
+          this.pool.push(displaced);
+        }
+      }
+    }
+
+    // Broadcast to *every* connected browser, including whichever one
+    // triggered this move - see the top-of-file comment on why that's
+    // deliberate.
+    this.room.broadcast(JSON.stringify(this.currentState()));
   }
 }

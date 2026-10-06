@@ -167,14 +167,36 @@ actually finish rather than open-ended "multiplayer".
 
 ### Build order (staged, each stage a working checkpoint)
 
-1. **Prove the plumbing**: a throwaway two-browser-tab demo (e.g. a shared
-   counter) through PartyKit, nothing diamond-nine-specific yet — confirms
-   the account/deploy setup actually works before any real app code depends on it.
-2. **Plain state sync (the real MVP)**: wire the existing slotAssignment +
-   pool model through a PartyKit room. A move only broadcasts once a card
-   is *dropped* — no in-progress drag streaming yet (see exclusions above).
-3. **Tutor controls + presence**: Start/Reset/End session, and the joined
-   name list.
+1. ✅ **Prove the plumbing** (2026-10-06): a throwaway two-browser-tab demo
+   (a shared counter) through PartyKit confirmed the local dev loop works,
+   with no account needed. Superseded by step 2 below and removed.
+2. ✅ **Plain state sync — the real MVP** (2026-10-06): `party/server.js`
+   now holds the real shared board (slotAssignment + pool, same shape as
+   app.js's own state), and `public/live.html`/`public/live.js` is a full
+   networked rebuild of the board UI — same visuals (reuses style.css
+   as-is), same interaction model (mouse drag, tap-to-place, full keyboard
+   navigation — ported line-for-line, not a stripped-down version).
+   A move only broadcasts once a card is *dropped*, no in-progress drag
+   streaming (see exclusions above). The browser never applies a move
+   locally — it sends a request and only updates once the server
+   broadcasts the new state back, which is what makes last-write-wins work
+   and is why the existing FLIP animation in render() ends up animating
+   *other people's* moves too, for free, with no extra code: it just
+   diffs before/after positions regardless of who caused the change.
+   Verified with two simulated browser tabs: a move in either one is
+   reflected identically in both, and a full keyboard-only pick-up-and-place
+   flow was also confirmed working on this page.
+   Cards are still a hardcoded demo set at this stage, not yet loaded from
+   a real tutor task — that wiring belongs with step 3's tutor controls,
+   since starting/ending a session is itself a tutor action.
+   Connects via a plain WebSocket to PartyKit's local dev server
+   (`ws://127.0.0.1:1999`) — fine for this build stage, but will need
+   updating to the real deployed PartyKit URL (and likely PartyKit's own
+   reconnecting `partysocket` client, for real-world flakiness) once this
+   is actually deployed.
+3. **Tutor controls + presence**: Start/Reset/End session, the joined
+   name list, and wiring `live.html` up to load a real task's cards
+   instead of the hardcoded demo set.
 4. **Concurrency test pass**: the simulated-concurrent-clients test
    described above, before this is considered done.
 

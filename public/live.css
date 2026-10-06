@@ -1,0 +1,18 @@
+/* Small additions specific to the live/shared-board page - everything
+   else (the diamond, pool, cards) comes from style.css, reused as-is so
+   the live board looks identical to the regular one. */
+
+.live-status {
+  font-size: 0.85rem;
+  color: var(--muted-ink);
+  margin: 0 0 1rem;
+}
+
+.live-status.connected {
+  color: #3f9e5c;
+}
+
+.live-status.disconnected {
+  color: #e2574c;
+  font-weight: 600;
+}

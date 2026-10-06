@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diamond Nine — Live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="live.css" />
+</head>
+<body>
+  <div class="too-small-notice">
+    <h1>Diamond Nine</h1>
+    <p>This app works best on a laptop, desktop, or larger tablet. Try widening your
+      browser window, rotating your device, or switching to a bigger screen.</p>
+  </div>
+
+  <div class="layout">
+    <div class="pool-panel">
+      <div class="pool-label" id="pool-label">Cards to sort</div>
+      <div class="pool" id="pool" aria-labelledby="pool-label"></div>
+    </div>
+
+    <div class="diamond-area">
+      <div class="diamond-stage">
+        <div class="hierarchy-arrow" aria-hidden="true">
+          <span class="hierarchy-head hierarchy-head-top"></span>
+          <span class="hierarchy-shaft"></span>
+          <span class="hierarchy-head hierarchy-head-bottom"></span>
+        </div>
+        <div class="diamond" id="diamond"></div>
+      </div>
+    </div>
+
+    <aside class="info-panel">
+      <h1 id="set-title">Diamond Nine — Live</h1>
+      <p id="live-status" class="live-status">Connecting…</p>
+      <p id="set-instructions" class="instructions visually-hidden">
+        This board is shared live - everyone with this link sees the same cards move in
+        real time. Drag a card into the diamond, or click/tap it to pick it up, then
+        click/tap another card to swap or an empty position to place it.
+      </p>
+    </aside>
+  </div>
+
+  <div id="live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="live.js"></script>
+</body>
+</html>

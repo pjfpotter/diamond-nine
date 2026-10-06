@@ -1,0 +1,452 @@
+// Live, shared-board version of app.js. See that file's own comments for
+// the parts that are identical in spirit (the FLIP animation, keyboard
+// navigation, drag/tap handling) - this file's comments mostly focus on
+// what's *different* about running over a network instead of locally.
+(function () {
+  'use strict';
+
+  const ROW_SIZES = [1, 2, 3, 2, 1];
+  const CARD_COLORS = ['coral', 'yellow', 'teal', 'violet'];
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const diamondEl = document.getElementById('diamond');
+  const poolEl = document.getElementById('pool');
+  const liveRegionEl = document.getElementById('live-region');
+  const statusEl = document.getElementById('live-status');
+
+  // The room to join - everyone who opens this page with the same
+  // ?room=... in the URL ends up on the same shared board. Defaults to a
+  // fixed name so two tabs opened with no query string at all still land
+  // in the same place, which is convenient for manual testing.
+  const roomId = new URLSearchParams(location.search).get('room') || 'demo-room';
+
+  // --- Shared state ---
+  //
+  // Unlike app.js, none of this is ever changed directly by this file in
+  // response to a drag/tap/keypress. It only ever gets overwritten
+  // wholesale when a 'state' message arrives from the server (see
+  // handleServerMessage below). This is the core difference from the
+  // solo version: here, the server's copy is the only one that's ever
+  // really "true", and this browser just displays whatever it was most
+  // recently told.
+  let cards = [];
+  let slotAssignment = new Array(9).fill(null);
+  let pool = [];
+
+  // These, by contrast, stay exactly as they were in app.js: they're
+  // purely local interaction state (which card *this* user has clicked to
+  // pick up, mid-interaction) - not something that needs to be shared
+  // with anyone else, since nobody else can see "you're thinking about
+  // moving this card" until you actually drop it somewhere.
+  let pickedUpCardId = null;
+  let pendingFocusCardId = null;
+  let justMovedCardId = null;
+  let dragDroppedCardId = null;
+
+  function cardById(id) {
+    return cards.find((c) => c.id === id);
+  }
+
+  function announce(message) {
+    liveRegionEl.textContent = '';
+    requestAnimationFrame(() => {
+      liveRegionEl.textContent = message;
+    });
+  }
+
+  function buildSlots() {
+    diamondEl.innerHTML = '';
+    let i = 0;
+    ROW_SIZES.forEach((size) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'diamond-row';
+      for (let c = 0; c < size; c += 1) {
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        slot.dataset.slotIndex = String(i);
+        slot.setAttribute('role', 'button');
+        slot.setAttribute('aria-label', `Empty position ${i + 1} of 9`);
+        rowEl.appendChild(slot);
+        i += 1;
+      }
+      diamondEl.appendChild(rowEl);
+    });
+  }
+
+  function cardColor(cardId) {
+    const index = cards.findIndex((c) => c.id === cardId);
+    return CARD_COLORS[index % CARD_COLORS.length];
+  }
+
+  function makeCardEl(card) {
+    const el = document.createElement('div');
+    el.className = `card card-${cardColor(card.id)}`;
+    el.dataset.cardId = card.id;
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', card.text);
+    const textEl = document.createElement('span');
+    textEl.className = 'card-text';
+    textEl.textContent = card.text;
+    el.appendChild(textEl);
+    if (card.id === pickedUpCardId) el.classList.add('picked-up');
+    if (card.text.length >= 23) el.classList.add('long-text');
+
+    let suppressNextEnter = card.id === justMovedCardId;
+    el.addEventListener('mouseenter', () => {
+      if (!el.closest('.slot')) return;
+      if (suppressNextEnter) {
+        suppressNextEnter = false;
+        return;
+      }
+      el.classList.add('magnify');
+    });
+    el.addEventListener('mouseleave', () => {
+      el.classList.remove('magnify');
+    });
+    return el;
+  }
+
+  function render() {
+    const existingRects = new Map();
+    document.querySelectorAll('.card').forEach((el) => {
+      existingRects.set(el.dataset.cardId, el.getBoundingClientRect());
+    });
+
+    document.querySelectorAll('.slot').forEach((slot) => {
+      slot.innerHTML = '';
+      slot.classList.remove('drop-target');
+    });
+    poolEl.innerHTML = '';
+    poolEl.classList.remove('drop-target');
+
+    slotAssignment.forEach((cardId, i) => {
+      const slot = diamondEl.querySelector(`[data-slot-index="${i}"]`);
+      if (!cardId) {
+        slot.tabIndex = 0;
+        slot.setAttribute('aria-label', `Empty position ${i + 1} of 9`);
+        return;
+      }
+      slot.tabIndex = -1;
+      slot.appendChild(makeCardEl(cardById(cardId)));
+    });
+
+    pool.forEach((cardId) => {
+      poolEl.appendChild(makeCardEl(cardById(cardId)));
+    });
+
+    justMovedCardId = null;
+    const skipAnimationCardId = dragDroppedCardId;
+    dragDroppedCardId = null;
+
+    // Same universal FLIP animation as app.js - and deliberately so. It
+    // doesn't know or care whether a card's position changed because
+    // *this* user dragged it, or because the server just told us someone
+    // else did - it just animates whatever moved. That's what makes
+    // another student's move visibly glide into place on your screen for
+    // free, with no extra code needed to special-case "remote" moves.
+    document.querySelectorAll('.card').forEach((el) => {
+      if (el.dataset.cardId === skipAnimationCardId) return;
+      const before = existingRects.get(el.dataset.cardId);
+      if (!before) return;
+      const after = el.getBoundingClientRect();
+      const dx = before.left - after.left;
+      const dy = before.top - after.top;
+      if (dx === 0 && dy === 0) return;
+      if (prefersReducedMotion) return;
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform 0.2s ease-out';
+        el.style.transform = '';
+      });
+    });
+
+    attachDragHandlers();
+
+    if (pendingFocusCardId) {
+      const el = document.querySelector(`.card[data-card-id="${pendingFocusCardId}"]`);
+      if (el) el.focus();
+      pendingFocusCardId = null;
+    }
+  }
+
+  function slotIndexOf(cardId) {
+    return slotAssignment.indexOf(cardId);
+  }
+
+  // The one real behavioural difference from app.js's moveCard(): this
+  // function does not touch slotAssignment/pool, and does not call
+  // render() itself. It only sends a request to the server - the actual
+  // state change (and the resulting re-render, for every connected
+  // browser at once) happens when the server's broadcast comes back in
+  // handleServerMessage(). This is what makes last-write-wins work: this
+  // browser never assumes its own move succeeded until the server
+  // confirms it by broadcasting the new state.
+  function requestMove(cardId, target) {
+    dragDroppedCardId = null; // only the drag-release path sets this, see onPointerUp
+    justMovedCardId = target !== 'pool' ? cardId : null;
+    send({ type: 'move', cardId, target });
+  }
+
+  // --- Pick up / place: identical logic to app.js, swapping moveCard()
+  // for requestMove() ---
+
+  function setPicking(on) {
+    document.body.classList.toggle('picking', on);
+  }
+
+  function releasePickup(message) {
+    pickedUpCardId = null;
+    document.querySelectorAll('.card').forEach((el) => el.classList.remove('picked-up'));
+    setPicking(false);
+    if (message) announce(message);
+  }
+
+  function handleActivateCard(cardId) {
+    if (!pickedUpCardId) {
+      pickedUpCardId = cardId;
+      document.querySelectorAll('.card').forEach((el) => {
+        el.classList.toggle('picked-up', el.dataset.cardId === cardId);
+      });
+      setPicking(true);
+      announce(`Picked up "${cardById(cardId).text}". Choose another card to swap with it, or an empty position, then press Enter. Press Escape to cancel.`);
+      return;
+    }
+    if (pickedUpCardId === cardId) {
+      releasePickup('Put back down. Nothing moved.');
+      return;
+    }
+    const saved = pickedUpCardId;
+    const pickedText = cardById(saved).text;
+    const targetText = cardById(cardId).text;
+    const targetSlot = slotIndexOf(cardId);
+    const target = targetSlot !== -1 ? targetSlot : 'pool';
+    pickedUpCardId = null;
+    setPicking(false);
+    pendingFocusCardId = saved;
+    requestMove(saved, target);
+    announce(`Placed "${pickedText}", swapped with "${targetText}".`);
+  }
+
+  function handleActivateSlot(slotIndex) {
+    if (!pickedUpCardId) {
+      announce('Empty position. Pick up a card first, then choose a position to place it.');
+      return;
+    }
+    const saved = pickedUpCardId;
+    const text = cardById(saved).text;
+    pickedUpCardId = null;
+    setPicking(false);
+    pendingFocusCardId = saved;
+    requestMove(saved, slotIndex);
+    announce(`Placed "${text}" in position ${slotIndex + 1} of 9.`);
+  }
+
+  // --- Keyboard navigation: identical to app.js ---
+
+  function getFocusableItems() {
+    const items = [];
+    poolEl.querySelectorAll('.card').forEach((el) => items.push(el));
+    for (let i = 0; i < 9; i += 1) {
+      const slotEl = diamondEl.querySelector(`[data-slot-index="${i}"]`);
+      const cardEl = slotEl.querySelector('.card');
+      items.push(cardEl || slotEl);
+    }
+    return items;
+  }
+
+  function onKeyDown(e) {
+    const cardEl = e.target.closest('.card');
+    const slotEl = !cardEl ? e.target.closest('.slot') : null;
+    if (!cardEl && !slotEl) return;
+    const currentEl = cardEl || slotEl;
+
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const items = getFocusableItems();
+      const idx = items.indexOf(currentEl);
+      if (idx !== -1) items[(idx + 1) % items.length].focus();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const items = getFocusableItems();
+      const idx = items.indexOf(currentEl);
+      if (idx !== -1) items[(idx - 1 + items.length) % items.length].focus();
+    } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      if (cardEl) handleActivateCard(cardEl.dataset.cardId);
+      else handleActivateSlot(Number(slotEl.dataset.slotIndex));
+    } else if (e.key === 'Escape' && pickedUpCardId) {
+      e.preventDefault();
+      releasePickup('Cancelled. Card stays where it was.');
+    }
+  }
+
+  // --- Pointer-based drag (mouse) with tap-to-place fallback: identical
+  // to app.js, swapping moveCard() for requestMove() ---
+
+  const DRAG_THRESHOLD = 6;
+  let dragState = null;
+
+  function attachDragHandlers() {
+    document.querySelectorAll('.card').forEach((el) => {
+      el.addEventListener('pointerdown', onPointerDown);
+    });
+  }
+
+  function onPointerDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    dragState = {
+      el,
+      cardId: el.dataset.cardId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      dragging: false,
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }
+
+  function beginDrag(e) {
+    const { el } = dragState;
+    el.classList.remove('magnify');
+    const rect = el.getBoundingClientRect();
+    dragState.dragging = true;
+    dragState.offsetX = e.clientX - rect.left;
+    dragState.offsetY = e.clientY - rect.top;
+    el.classList.add('dragging');
+    el.style.position = 'fixed';
+    el.style.left = `${rect.left}px`;
+    el.style.top = `${rect.top}px`;
+    el.style.width = `${rect.width}px`;
+    el.style.height = `${rect.height}px`;
+    el.style.zIndex = '60';
+  }
+
+  function onPointerMove(e) {
+    if (!dragState) return;
+    if (!dragState.dragging) {
+      const dx = e.clientX - dragState.startClientX;
+      const dy = e.clientY - dragState.startClientY;
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      beginDrag(e);
+    }
+    dragState.el.style.left = `${e.clientX - dragState.offsetX}px`;
+    dragState.el.style.top = `${e.clientY - dragState.offsetY}px`;
+
+    document.querySelectorAll('.drop-target').forEach((n) => n.classList.remove('drop-target'));
+    const dropZone = findDropZone(e.clientX, e.clientY);
+    if (dropZone) dropZone.classList.add('drop-target');
+  }
+
+  function onPointerUp(e) {
+    if (!dragState) return;
+    const { el, cardId, dragging } = dragState;
+
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    document.querySelectorAll('.drop-target').forEach((n) => n.classList.remove('drop-target'));
+
+    if (!dragging) {
+      dragState = null;
+      handleActivateCard(cardId);
+      return;
+    }
+
+    const dropZone = findDropZone(e.clientX, e.clientY);
+    el.classList.remove('dragging');
+    el.style.position = '';
+    el.style.left = '';
+    el.style.top = '';
+    el.style.width = '';
+    el.style.height = '';
+    el.style.zIndex = '';
+    dragState = null;
+
+    if (!dropZone) {
+      render(); // released somewhere invalid - re-render from the last known server state to snap back
+      return;
+    }
+
+    dragDroppedCardId = cardId;
+    if (dropZone.classList.contains('pool')) {
+      requestMove(cardId, 'pool');
+    } else {
+      requestMove(cardId, Number(dropZone.dataset.slotIndex));
+    }
+  }
+
+  function findDropZone(x, y) {
+    const els = document.elementsFromPoint(x, y);
+    return els.find((n) => n.classList.contains('slot') || n.id === 'pool') || null;
+  }
+
+  diamondEl.addEventListener('click', (e) => {
+    const slotEl = e.target.closest('.slot');
+    if (slotEl && e.target === slotEl) {
+      handleActivateSlot(Number(slotEl.dataset.slotIndex));
+    }
+  });
+
+  diamondEl.addEventListener('keydown', onKeyDown);
+  poolEl.addEventListener('keydown', onKeyDown);
+
+  // --- Networking ---
+  //
+  // Plain WebSocket is enough for this build stage - PartyKit's own
+  // reconnecting client (partysocket) is a reasonable upgrade later for
+  // real-world flakiness (phones locking, WiFi drops), but isn't needed
+  // yet to prove the shared-board sync itself works.
+
+  let ws = null;
+
+  function send(data) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+  }
+
+  function setStatus(connected) {
+    if (connected) {
+      statusEl.textContent = `Connected — sharing room "${roomId}"`;
+      statusEl.classList.add('connected');
+      statusEl.classList.remove('disconnected');
+    } else {
+      statusEl.textContent = 'Disconnected — trying to reconnect…';
+      statusEl.classList.add('disconnected');
+      statusEl.classList.remove('connected');
+    }
+  }
+
+  function handleServerMessage(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'state') {
+      cards = data.cards;
+      slotAssignment = data.slotAssignment;
+      pool = data.pool;
+      render();
+    }
+  }
+
+  function connect() {
+    // ws://127.0.0.1:1999 is PartyKit's local dev server address. Once
+    // this is deployed for real (see spec.md's build order, a later
+    // stage), this will need to point at the deployed PartyKit URL
+    // instead - that's a small, deliberate change to make later, not
+    // something to solve before the sync logic itself is proven.
+    ws = new WebSocket(`ws://127.0.0.1:1999/party/${encodeURIComponent(roomId)}`);
+    ws.addEventListener('open', () => setStatus(true));
+    ws.addEventListener('close', () => {
+      setStatus(false);
+      setTimeout(connect, 1000); // simple fixed-delay reconnect attempt
+    });
+    ws.addEventListener('message', handleServerMessage);
+  }
+
+  // --- Boot ---
+
+  buildSlots();
+  connect();
+})();
