@@ -24,21 +24,17 @@
 // it depends on hosting decisions not yet made.
 const API_BASE = 'http://localhost:3000';
 
-// Placeholder cards used only if a room's id doesn't match any real task
-// (e.g. manual testing with a made-up room name like "demo-room") - keeps
-// the Stage 1/2 style of ad-hoc testing still possible without a real
-// tutor account.
-const FALLBACK_CARDS = [
-  { id: 'card-0', text: 'Everyone should get the same reward regardless of effort' },
-  { id: 'card-1', text: 'Rules should always be followed, no exceptions' },
-  { id: 'card-2', text: 'Honesty matters more than sparing someone’s feelings' },
-  { id: 'card-3', text: 'The needs of the group outweigh the needs of one person' },
-  { id: 'card-4', text: 'People deserve a second chance after a mistake' },
-  { id: 'card-5', text: 'Some traditions should change even if they’re old' },
-  { id: 'card-6', text: 'It’s fair to treat people differently based on need' },
-  { id: 'card-7', text: 'Freedom of choice matters more than following advice' },
-  { id: 'card-8', text: 'Standing up for what’s right is worth the cost' },
-];
+// Cost-abuse defenses. A Durable Object is billed by connection-time and
+// message volume, so the two shapes worth defending against are: a single
+// legitimate link going viral (capped by MAX_CONNECTIONS_PER_ROOM below),
+// and something cheaper and sneakier - spinning up endless *different*
+// rooms, each a fresh billable Durable Object, by hitting made-up room
+// ids. The second one used to be free to do here, because an unrecognised
+// room id silently got a working demo board (see the old FALLBACK_CARDS,
+// removed) rather than being refused. See spec.md's cost-defense notes.
+const MAX_CONNECTIONS_PER_ROOM = 50; // generously above any real class size
+const MESSAGE_WINDOW_MS = 1000;
+const MAX_MESSAGES_PER_WINDOW = 30; // well above legitimate traffic (drag-move self-throttles to ~20/s client-side) - this is the server not trusting that self-throttling, since a non-browser client could ignore it entirely
 
 export default class Server {
   constructor(room) {
@@ -64,18 +60,45 @@ export default class Server {
     // existing last-write-wins behaviour regardless of who's "claimed"
     // what, so there's nothing for a hard lock to actually protect.
     this.draggedBy = new Map();
+    // connection id -> timestamps of its recent messages, for the
+    // per-connection message rate limit (see allowMessage below).
+    this.messageTimestamps = new Map();
     // Loaded lazily on the first connection rather than in the
     // constructor, because loading real task data is asynchronous (an
-    // HTTP call) and a constructor can't be awaited.
-    this.loaded = false;
+    // HTTP call) and a constructor can't be awaited. See ensureLoaded().
+    this.loadPromise = null;
+    // Set once ensureLoaded() has actually confirmed this room id
+    // corresponds to a real saved task. A room that never becomes valid
+    // refuses every connection (see onConnect) - no fallback demo board
+    // for an unrecognised id. That used to exist for local ad-hoc testing
+    // convenience, but it also meant any made-up room id got a fully
+    // working, billable room for free; create a real test task instead
+    // (the tutor flow already makes this quick) rather than typing a
+    // random room name into the URL.
+    this.validRoom = false;
   }
 
   // Runs once, the first time anyone connects to this room. Tries to load
-  // the real task this room is for for; falls back to a fixed demo set if
-  // that fails (wrong/made-up room id, or the Express app isn't running).
-  async ensureLoaded() {
-    if (this.loaded) return;
-    this.loaded = true;
+  // the real task this room is for; a room whose id doesn't match any
+  // real task is left invalid, and onConnect refuses every connection to
+  // it rather than silently standing up a working board for a made-up id.
+  //
+  // Several connections can arrive at once (e.g. several students opening
+  // the link within the same second) and all call this before the first
+  // load has finished - they need to share the *same* in-flight request
+  // and all wait for it, rather than each checking a synchronous "already
+  // loading" flag and moving on before validRoom has actually been set.
+  // That race was real: it caused later-arriving concurrent connections to
+  // see loaded-but-not-yet-valid and get wrongly rejected as "unknown
+  // session" even though the room was perfectly real.
+  ensureLoaded() {
+    if (!this.loadPromise) {
+      this.loadPromise = this.load();
+    }
+    return this.loadPromise;
+  }
+
+  async load() {
     try {
       const res = await fetch(`${API_BASE}/api/sets/${encodeURIComponent(this.room.id)}`);
       if (res.ok) {
@@ -88,13 +111,12 @@ export default class Server {
         // code already writes to, and that endpoint's reader (tutor.js's
         // renderResults) expects ids in this shape to look the card back up.
         this.cards = data.cards.map((c, i) => ({ id: `card-${i}`, text: c.text }));
-      } else {
-        this.cards = FALLBACK_CARDS;
+        this.pool = this.cards.map((c) => c.id);
+        this.validRoom = true;
       }
     } catch (err) {
-      this.cards = FALLBACK_CARDS;
+      // Leave validRoom false - e.g. the Express app isn't reachable.
     }
-    this.pool = this.cards.map((c) => c.id);
   }
 
   currentState() {
@@ -118,11 +140,42 @@ export default class Server {
 
   async onConnect(connection) {
     await this.ensureLoaded();
+    if (!this.validRoom) {
+      // Refuse before doing anything else - cheap rejection, no room
+      // state ever gets created for an id nobody ever saved a task under.
+      connection.close(4004, 'Unknown session');
+      return;
+    }
+
+    // PartyKit adds a connection to the room before calling onConnect, so
+    // this count already includes the one that just arrived - up to
+    // MAX_CONNECTIONS_PER_ROOM are accepted, the next one is refused.
+    const activeConnections = [...this.room.getConnections()].length;
+    if (activeConnections > MAX_CONNECTIONS_PER_ROOM) {
+      connection.close(4029, 'This session is full');
+      return;
+    }
+
     connection.send(JSON.stringify(this.currentState()));
     connection.send(JSON.stringify(this.presenceMessage()));
   }
 
+  // Simple fixed-window rate limit, independent of anything the client
+  // claims to be doing - a non-browser client ignoring live.js's own
+  // throttling entirely is exactly what this guards against.
+  allowMessage(connectionId) {
+    const now = Date.now();
+    const recent = (this.messageTimestamps.get(connectionId) || []).filter(
+      (t) => now - t < MESSAGE_WINDOW_MS
+    );
+    if (recent.length >= MAX_MESSAGES_PER_WINDOW) return false;
+    recent.push(now);
+    this.messageTimestamps.set(connectionId, recent);
+    return true;
+  }
+
   onClose(connection) {
+    this.messageTimestamps.delete(connection.id);
     if (this.presentNames.delete(connection.id)) {
       this.room.broadcast(JSON.stringify(this.presenceMessage()));
     }
@@ -140,6 +193,7 @@ export default class Server {
   }
 
   async onMessage(message, sender) {
+    if (!this.allowMessage(sender.id)) return; // over the rate limit - drop silently, no need to tell a flooding client anything
     const data = JSON.parse(message);
     if (data.type === 'join') {
       this.presentNames.set(sender.id, String(data.name || '').slice(0, 200));

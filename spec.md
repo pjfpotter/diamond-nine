@@ -368,6 +368,50 @@ anything beyond a handful of concurrent rooms.
   an abrupt mid-drag disconnect; Stage 3 (reset/end) and Stage 4
   (concurrency) were re-run afterward and still pass unchanged.
 
+### Cost-abuse defenses (2026-10-06, ✅ built)
+
+Deploying to a paid Cloudflare Workers plan (Durable Objects bill by
+connection-time and message volume) raised an obvious question: what
+stops a leaked/viral link, or just a flood of made-up room ids, from
+running up a large bill? Cloudflare has no "hard stop spending" switch
+for Workers - usage notifications exist and are worth turning on
+separately, but the real defense has to be limits this app enforces
+itself. Three, all in `party/server.js`:
+
+- **Unknown room ids are refused outright**, not given a working demo
+  board. This mattered more than it sounds: a room used to silently fall
+  back to a fixed demo card set for any id that didn't match a real task,
+  which meant spinning up endless *different* rooms - each a fresh
+  billable Durable Object - cost an attacker nothing. Now `ensureLoaded()`
+  only marks a room valid once it's confirmed against a real
+  `/api/sets/:id`, and `onConnect` closes the connection (code 4004)
+  immediately for anything else.
+- **A hard cap of 50 concurrent connections per room.** Generously above
+  any real class size; connection 51 gets closed (code 4029, "This
+  session is full") rather than joining.
+- **A per-connection message rate limit** (30/sec), enforced server-side
+  regardless of what a client claims to be doing - `live.js`'s own
+  20/sec drag-move throttle only restrains a well-behaved browser; this
+  is what stops a raw WebSocket client ignoring that entirely.
+
+Found and fixed a real race while verifying the first one: multiple
+connections arriving at once (exactly what several students opening a
+link within the same second looks like) all called `ensureLoaded()`
+before the very first one's fetch had resolved. The old code set a
+synchronous "already loading" flag before awaiting, so the later
+arrivals saw "loaded" but not yet "valid" and were wrongly rejected as
+unknown sessions. Fixed by having every caller await the *same* in-flight
+promise instead of racing a boolean flag - re-ran Stage 4's concurrency
+test afterward (6 simultaneous connections) to confirm it actually fixed
+the race rather than papering over the symptom.
+
+Verified directly against the real PartyKit room (raw WebSocket clients,
+no browser needed for this one): an unknown room id was refused with the
+correct close code; flooding 100 messages in under a second produced
+exactly 30 state broadcasts, then the room worked normally again once
+the window cleared; 52 simultaneous connection attempts against the cap
+of 50 produced exactly 50 accepted and 2 refused with the correct reason.
+
 ## Tech shape
 
 - Vanilla HTML/CSS/JS, no build step (per CLAUDE.md) — but the accessibility requirement (keyboard drag-and-drop) may push toward using a small, well-tested library rather than hand-rolling it. Flag this as a decision point for the build itself, not pre-decided here.
