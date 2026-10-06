@@ -473,6 +473,21 @@ exactly 30 state broadcasts, then the room worked normally again once
 the window cleared; 52 simultaneous connection attempts against the cap
 of 50 produced exactly 50 accepted and 2 refused with the correct reason.
 
+### Known issues / later polish (not urgent)
+
+- **Presence line conflates "named" with "present" (2026-10-06).** The
+  presence indicator (`public/live.js`'s presence-line, backed by
+  `presenceMessage()` in `worker/index.js`) only counts connections that
+  typed a display name in the join prompt — anyone who skips that field is
+  invisible to it. So "Waiting for others to join…" can show even while
+  several anonymous people are already connected and able to drag cards,
+  which reads as more confusing than reassuring. Flagged during real
+  classroom use; not fixed yet - would mean tracking connection count
+  separately from the named-people list (e.g. "3 people here (2 named):
+  Alice, Bob" or similar), which touches both the server's presence
+  payload shape and the client's rendering of it. Revisit when there's
+  time to make this change carefully rather than as a last-minute tweak.
+
 ## Tech shape
 
 - Vanilla HTML/CSS/JS, no build step (per CLAUDE.md) — but the accessibility requirement (keyboard drag-and-drop) may push toward using a small, well-tested library rather than hand-rolling it. Flag this as a decision point for the build itself, not pre-decided here.
