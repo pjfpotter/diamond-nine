@@ -155,13 +155,9 @@ actually finish rather than open-ended "multiplayer".
 
 ### Explicitly excluded, even from this scoped version
 
-- Live cursors or per-card "who's dragging this" indicators. (Discussed
-  2026-10-06: this needs broadcasting in-progress drag position at a
-  continuous rate, not just final drop position, plus a rule for who wins
-  when two people grab the same card at once, plus new "ghost card"
-  rendering for everyone else's in-progress drags. Real, but a clearly
-  separable later step once plain final-position sync is solid — not part
-  of this build.)
+- Live cursors or per-card "who's dragging this" indicators — out of
+  *this* build specifically (now fully spec'd as its own stretch goal
+  below, not forgotten, just deliberately not part of Stages 1-4).
 - Granular per-card locking, session replay/history, and scaling past a
   handful of concurrent rooms.
 
@@ -248,6 +244,107 @@ actually finish rather than open-ended "multiplayer".
 - **Client library**: PartyKit's `partysocket` client, loaded the same
   dependency-light way everything else in this app is (a CDN `<script
   type="module">` import, no build step/bundler introduced).
+
+### Stretch goal: visible live dragging (2026-10-06, not started)
+
+Everything above only ever shows a card's *final* position once it's
+dropped — exactly what was built and tested in Stages 1-4. This section
+specs out the explicitly-excluded extra: seeing *other people's cards
+actually move* while they're still dragging them, Figma/Miro-style, not
+just teleporting into place after the fact. This is real, separable work
+on top of a finished foundation, not a prerequisite for anything above —
+nothing in this section should be started before the four stages above
+are solid, since this only adds cosmetic polish on top of state sync
+that already has to be correct regardless.
+
+**What it actually adds.** While one person has a card mid-drag (mouse
+down, moved past the threshold, not yet released), everyone else sees a
+translucent "ghost" copy of that card following the dragger's cursor in
+real time, labelled with their name if they gave one. The real card
+stays exactly where it already was in everyone else's board (in its
+slot or the pool) until the drag actually completes — the ghost is a
+visual overlay on top of the real board, never a change to the real
+board's own rendering, which is what keeps this additive rather than a
+rewrite of anything already built and tested.
+
+**New message types** (party/server.js only relays these — it does not
+validate or store them as part of the authoritative board state, since
+they're purely cosmetic and never affect correctness):
+- `drag-start` `{cardId}` — sent once, the moment a local drag crosses
+  the existing DRAG_THRESHOLD in app.js/live.js.
+- `drag-move` `{cardId, xPct, yPct}` — sent repeatedly while dragging,
+  throttled (see below). Positions are percentages of a shared reference
+  element's bounding box (e.g. `.layout`), **never raw pixels** — two
+  people's screens are different sizes, so a raw pixel coordinate from a
+  1920px-wide monitor means something completely different on a 1366px
+  laptop. This is the one easy-to-miss detail that would otherwise make
+  the ghost render in a visibly wrong spot on anyone with a differently
+  sized window.
+- `drag-end` `{cardId}` — sent on every pointerup, whether or not the
+  drop produced a real move (e.g. dropped off-board) - this is what
+  tells everyone else to remove that ghost. Relying only on the
+  eventual `state` broadcast to clear it would leave a stale ghost
+  on-screen forever after an invalid drop, since no `move` message (and
+  therefore no new `state`) follows one.
+
+**Throttling, not every pointermove.** Raw `pointermove` events can fire
+well past 60 times a second; broadcasting every one, multiplied across
+several simultaneous draggers, is wasteful for no visible benefit.
+Throttle `drag-move` sends to roughly 15-20 times a second (e.g. only
+send if ≥50ms has passed since the last send for that drag) - smooth
+enough to look continuous, far cheaper on the room.
+
+**Who "wins" when two people grab the same card.** This needs a
+lightweight claim, not real locking - correctness is still guaranteed
+regardless by the existing last-write-wins move logic (already tested in
+Stage 4), so this is purely about avoiding a confusing visual fight, not
+a new source of truth:
+- The server keeps an in-memory `Map<cardId, connectionId>` of
+  who's currently dragging what, set on `drag-start` and cleared on
+  `drag-end` (and on that connection's `onClose`, same cleanup pattern
+  already used for presence).
+- `drag-start` broadcasts who now holds the card; every other client
+  visually marks that card as "being moved by someone else" (a subtle
+  dimmed/outlined state) and should discourage - but not hard-block -
+  grabbing it themselves, since hard-blocking risks a card getting
+  permanently stuck claimed by someone whose `drag-end` got lost (a
+  dropped connection mid-drag - exactly Stage 4's Scenario C). If someone
+  grabs it anyway, both drags can be visually shown; whichever `move`
+  message the server receives second still simply wins, same as today.
+
+**Rendering.** The ghost is a freshly-created overlay element per remote
+drag (styled like the real `.card` but with reduced opacity and a small
+name tag), positioned with the percentage coordinates converted back to
+pixels against the local browser's own copy of the same reference
+element's current bounding box - never reusing or moving the real card
+element itself. Removed on `drag-end`, or immediately superseded by the
+normal FLIP-animated settle once the real `state` broadcast lands.
+
+**Scope boundary.** This only applies to mouse-drag interactions, which
+are the only ones with a continuous in-between position to broadcast in
+the first place - keyboard and tap-to-place pick-up/place are
+instantaneous (no cursor to follow) and are explicitly untouched by this
+stretch goal.
+
+**Suggested build order**, same staged-checkpoint style as the main
+feature:
+1. Prove the coordinate-normalization idea in isolation (two tabs, one
+   moving dot synced by percentage position) before touching real cards
+   - this is the one genuinely fiddly new piece, worth isolating first.
+2. Wire `drag-start`/`drag-move`/`drag-end` through party/server.js as a
+   pure relay, and render real ghost cards in live.js.
+3. Add the "being moved by someone else" visual state and the
+   claim map, including its cleanup on disconnect.
+4. A concurrency-style test extending test/concurrency.js's approach:
+   simulate two clients "dragging" the same card (sending interleaved
+   `drag-move` for both) and confirm neither ghost ever reflects the
+   other's position, and that a dropped connection mid-drag (`drag-start`
+   with no matching `drag-end`) doesn't leave a permanently-claimed card.
+
+Still excluded even if this is built: granular per-card locking that
+actually prevents a second grab (rejected above, for the dropped-
+connection reason given), session replay/history of drag movements, and
+anything beyond a handful of concurrent rooms.
 
 ## Tech shape
 
