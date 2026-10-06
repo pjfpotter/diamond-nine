@@ -218,8 +218,21 @@ actually finish rather than open-ended "multiplayer".
    data loads correctly, presence updates live, a move in one is reflected
    in the other, Reset and End both work, moves are rejected after End,
    and the saved result is correct.
-4. **Concurrency test pass**: the simulated-concurrent-clients test
-   described above, before this is considered done.
+4. ✅ **Concurrency test pass** (2026-10-06): `test/concurrency.js`, run
+   with `npm run test:concurrency` - a real, kept test (not a throwaway
+   verification script), since concurrency bugs are exactly the kind
+   "it worked when I tried it alone" cannot catch. Connects several raw
+   WebSocket clients (Node's own built-in fetch/WebSocket, no new
+   dependency) straight to a real PartyKit room and fires genuinely
+   simultaneous moves at it: the same card grabbed for different slots at
+   once, different cards shoved into the same slot at once, and an abrupt
+   disconnect mid-interaction. After each, it checks the one invariant
+   that actually matters - every one of the 9 cards appears in exactly one
+   place (a slot or the pool), never duplicated, never lost. Sanity-
+   checked the checker itself against deliberately broken states
+   (a duplicated card, a missing card) to confirm it actually fails when
+   it should, not just always passing. All scenarios pass against the
+   real backend.
 
 ### New moving parts this introduces (be aware of, not blockers)
 

@@ -5,7 +5,8 @@
   "description": "Diamond nine card sort tool for online tutoring sessions",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test:concurrency": "node test/concurrency.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",
