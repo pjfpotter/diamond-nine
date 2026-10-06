@@ -284,14 +284,28 @@ export default class Server {
       arrangement[i] = cardId;
     });
     const names = Array.from(this.presentNames.values()).filter((n) => n.trim());
-    const studentName = names.length ? names.join(', ') : 'Live group session';
+    // The /results endpoint this is about to call caps student_name at
+    // 200 characters (same rule the solo async flow already follows) -
+    // truncate here too, since a handful of participants with real names
+    // easily joins into something longer than that, and fetch() does NOT
+    // throw on a 4xx response: an over-length name would otherwise fail
+    // this save completely and silently, with nothing anywhere to show
+    // for it.
+    const studentName = (names.length ? names.join(', ') : 'Live group session').slice(0, 200);
 
     try {
-      await fetch(`${API_BASE}/api/sets/${encodeURIComponent(this.room.id)}/results`, {
+      const res = await fetch(`${API_BASE}/api/sets/${encodeURIComponent(this.room.id)}/results`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ student_name: studentName, arrangement }),
       });
+      if (!res.ok) {
+        // fetch() only rejects on network-level failures, never on an
+        // HTTP error status - without this check, a rejected save (e.g. a
+        // future validation rule this code doesn't know about) would be
+        // indistinguishable from a successful one.
+        console.error('Failed to save live session result:', res.status, await res.text().catch(() => ''));
+      }
     } catch (err) {
       // If saving fails (e.g. Express app not reachable), the live
       // session still ended from every connected browser's point of view

@@ -7,6 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const Database = require('better-sqlite3');
+const QRCode = require('qrcode');
 
 // Allow the database file's location to be overridden via an environment
 // variable (handy for tests, so they can point at a throwaway file instead
@@ -329,6 +330,45 @@ app.get('/api/sets/:id/results', requireTutor, (req, res) => {
     // arrangement as a raw JSON string, but API consumers want a real object.
     results: rows.map((r) => ({ ...r, arrangement: JSON.parse(r.arrangement) })),
   });
+});
+
+// Renders a QR code image for one of this app's own links (the tutor
+// dashboard uses this for a live session's student link). Deliberately
+// restricted to links on this same origin rather than accepting any
+// arbitrary text - without that check, this endpoint would double as a
+// free, open "turn any text into a QR code" image service for anyone who
+// found the URL, with no benefit to this app at all.
+app.get('/api/qr', rateLimit({ windowMs: 60 * 1000, max: 30 }), async (req, res) => {
+  const { text } = req.query;
+  if (typeof text !== 'string' || !text) {
+    return res.status(400).json({ error: 'missing text' });
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(text);
+  } catch (err) {
+    return res.status(400).json({ error: 'text must be a valid URL' });
+  }
+  const ownOrigin = `${req.protocol}://${req.get('host')}`;
+  if (parsed.origin !== ownOrigin) {
+    return res.status(400).json({ error: 'only links to this app can be turned into a QR code' });
+  }
+
+  try {
+    const png = await QRCode.toBuffer(text, {
+      width: 600,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    });
+    res.set('Content-Type', 'image/png');
+    // The link this encodes never changes for a given task, so this image
+    // never needs to be regenerated for the same URL - safe to cache.
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(png);
+  } catch (err) {
+    res.status(500).json({ error: 'could not generate QR code' });
+  }
 });
 
 // Catch-all error handler: malformed JSON bodies, oversized payloads, and

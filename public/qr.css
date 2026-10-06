@@ -1,0 +1,79 @@
+/* QR display page - deliberately simple: one big, legible code and the
+   link underneath, meant to be shown full-screen (e.g. projected) so a
+   room full of people can scan it at once. */
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--canvas);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 18px 18px;
+  font-family: "Lexend", "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+}
+
+.qr-panel {
+  background: var(--panel-bg);
+  border-radius: 1.25rem;
+  box-shadow: 0 16px 40px rgba(34, 38, 43, 0.15);
+  padding: 2.5rem 3rem 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 40rem;
+}
+
+.qr-brand {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-ink);
+}
+
+.qr-panel h1 {
+  margin: 0 0 1.75rem;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+#qr-image {
+  width: min(70vw, 420px);
+  height: auto;
+  border-radius: 0.75rem;
+  border: 1.5px solid #ece8dd;
+}
+
+.qr-link-row {
+  margin: 1.75rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#qr-link-text {
+  font-size: 0.9rem;
+  color: var(--muted-ink);
+  word-break: break-all;
+}
+
+/* style.css's base button rule defaults to width:100% (right for the
+   main app's stacked action buttons) - this one sits inline next to text
+   instead, so it needs its natural width back. */
+#qr-copy-btn {
+  width: auto;
+  white-space: nowrap;
+}
+
+.qr-error {
+  margin-top: 1.5rem;
+  color: #b3261e;
+  font-size: 0.9rem;
+}

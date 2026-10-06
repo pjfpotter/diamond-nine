@@ -40,6 +40,18 @@ Known failure mode: it gets stale with overuse, so this tool should be quick to 
 - Generate a shareable link per set
 - Save sets for reuse across students/sessions
 - View submitted results per link (which student, if named, and their final arrangement)
+- **QR code for a live session's link** (2026-10-06): a "Show QR code"
+  button next to the live session's student link opens a dedicated page
+  (`qr.html`) in a new tab/window - just the Diamond Nine brand, the
+  task's title, and one large scannable code, meant to be put up on a
+  projector so a whole room can scan it at once rather than everyone
+  typing a URL. The QR image itself is rendered server-side
+  (`GET /api/qr`, using the `qrcode` package) rather than client-side,
+  deliberately restricted to links on this app's own origin - without
+  that check it would double as a free, open "turn any text into a QR
+  code" image service for anyone who found the endpoint, for no benefit
+  to this app. Rate-limited the same way the other unauthenticated
+  endpoints already are.
 
 ## Diamond geometry (locked rule — do not re-litigate)
 

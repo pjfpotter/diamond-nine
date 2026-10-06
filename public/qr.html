@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diamond Nine — QR code</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="qr.css" />
+</head>
+<body>
+  <main class="qr-panel">
+    <p class="qr-brand">Diamond Nine</p>
+    <h1 id="qr-title">Scan to join</h1>
+    <img id="qr-image" alt="QR code linking to this task" />
+    <p class="qr-link-row">
+      <span id="qr-link-text"></span>
+      <button type="button" id="qr-copy-btn" class="secondary">Copy link</button>
+    </p>
+    <p id="qr-error" class="qr-error" hidden>Could not load the QR code. Check the link below instead.</p>
+  </main>
+
+  <script src="qr.js"></script>
+</body>
+</html>

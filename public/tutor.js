@@ -400,6 +400,15 @@
     document.getElementById('live-student-link-input').value = liveStudentLink;
     document.getElementById('copy-live-link-btn').onclick = (e) => copyToClipboard(liveStudentLink, e.currentTarget);
     document.getElementById('open-live-host-link').href = liveHostLink;
+
+    // Read straight from the title field rather than threading it through
+    // as a parameter - showShareBlock always runs on the same editor page
+    // this field already lives on, so there's nothing to pass along.
+    const title = document.getElementById('field-title').value.trim();
+    document.getElementById('show-qr-btn').onclick = () => {
+      const qrUrl = `${location.origin}/qr.html?link=${encodeURIComponent(liveStudentLink)}&title=${encodeURIComponent(title)}`;
+      window.open(qrUrl, '_blank', 'noopener');
+    };
   }
 
   async function renderResults(id) {
