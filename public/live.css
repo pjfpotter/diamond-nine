@@ -16,3 +16,73 @@
   color: #e2574c;
   font-weight: 600;
 }
+
+.live-presence {
+  font-size: 0.85rem;
+  color: var(--muted-ink);
+  margin: 0 0 1.25rem;
+}
+
+.join-name-form {
+  margin: 0 0 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1.5px solid #ece8dd;
+}
+
+.join-name-form .field {
+  display: block;
+  margin: 0 0 0.75rem;
+}
+
+.join-name-form .field > span:first-child {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+
+.join-name-form .field input[type="text"] {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1.5px solid #d9d5c9;
+  background: #fff;
+  color: var(--ink);
+}
+
+.host-controls {
+  margin: 0 0 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1.5px solid #ece8dd;
+}
+
+.host-controls-label {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.host-controls-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.host-controls-actions button {
+  width: 100%;
+}
+
+.host-controls-actions .danger {
+  background: #fdecea;
+  color: #b3261e;
+  border-color: #f3c6c1;
+}
+
+.ended-banner {
+  background: #fdf6e3;
+  border: 1.5px solid #e8d8a0;
+  border-radius: 0.6rem;
+  padding: 0.8rem 1rem;
+  font-size: 0.9rem;
+}

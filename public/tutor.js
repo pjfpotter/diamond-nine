@@ -389,6 +389,17 @@
     document.getElementById('share-link-input').value = link;
     document.getElementById('copy-share-link-btn').onclick = (e) => copyToClipboard(link, e.currentTarget);
     document.getElementById('view-results-link').href = `#/results/${id}`;
+
+    // The live session reuses the task's own id as its PartyKit room id -
+    // one task, one room, kept simple rather than minting a separate id
+    // per session. The host link carries the tutor's token so the live
+    // page knows to show Reset/End controls; the student link carries no
+    // token at all, same "no login, ever" rule as the rest of the app.
+    const liveStudentLink = `${location.origin}/live.html?room=${encodeURIComponent(id)}`;
+    const liveHostLink = `${liveStudentLink}&token=${encodeURIComponent(getToken())}`;
+    document.getElementById('live-student-link-input').value = liveStudentLink;
+    document.getElementById('copy-live-link-btn').onclick = (e) => copyToClipboard(liveStudentLink, e.currentTarget);
+    document.getElementById('open-live-host-link').href = liveHostLink;
   }
 
   async function renderResults(id) {

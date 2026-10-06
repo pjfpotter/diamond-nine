@@ -194,9 +194,30 @@ actually finish rather than open-ended "multiplayer".
    updating to the real deployed PartyKit URL (and likely PartyKit's own
    reconnecting `partysocket` client, for real-world flakiness) once this
    is actually deployed.
-3. **Tutor controls + presence**: Start/Reset/End session, the joined
-   name list, and wiring `live.html` up to load a real task's cards
-   instead of the hardcoded demo set.
+3. ✅ **Tutor controls + presence** (2026-10-06): `live.html` now loads a
+   room's real task data (title, instructions, cards) from the existing
+   `/api/sets/:id` endpoint, keyed by the task's own id as the room id -
+   no separate session-id minting. The tutor's share-block (tutor.js) now
+   shows a live-session student link alongside the existing async one,
+   plus a separate "host" link carrying their tutor token.
+   A host sees Reset board / End session controls (two-click confirm on
+   End, matching the app's existing no-native-dialogs convention); a
+   student never does, regardless of what's in their URL - the *server*
+   independently re-validates the token against the real tutor-auth check
+   before honouring either action (verified: a fabricated `?token=` shows
+   the controls client-side but a reset request against it is silently
+   rejected, board state unchanged). Reset clears the board back to the
+   pool; End freezes all further moves everywhere, broadcasts that, and
+   saves the final arrangement as one row through the *existing*
+   `/api/sets/:id/results` endpoint - `student_name` is whoever joined
+   with a name, comma-joined (or "Live group session" if nobody did) -
+   confirmed that saved row renders correctly in the tutor's existing
+   Results view with no changes needed there.
+   Presence is a simple joined-names line, updated on join and on
+   disconnect. Verified end to end with two simulated browsers: real task
+   data loads correctly, presence updates live, a move in one is reflected
+   in the other, Reset and End both work, moves are rejected after End,
+   and the saved result is correct.
 4. **Concurrency test pass**: the simulated-concurrent-clients test
    described above, before this is considered done.
 

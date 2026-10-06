@@ -13,12 +13,31 @@
   const poolEl = document.getElementById('pool');
   const liveRegionEl = document.getElementById('live-region');
   const statusEl = document.getElementById('live-status');
+  const titleEl = document.getElementById('set-title');
+  const instructionsEl = document.getElementById('set-instructions');
+  const presenceEl = document.getElementById('presence-line');
+  const joinFormEl = document.getElementById('join-name-form');
+  const hostControlsEl = document.getElementById('host-controls');
+  const endedBannerEl = document.getElementById('ended-banner');
+  const resetBtn = document.getElementById('reset-board-btn');
+  const endBtn = document.getElementById('end-session-btn');
 
   // The room to join - everyone who opens this page with the same
   // ?room=... in the URL ends up on the same shared board. Defaults to a
   // fixed name so two tabs opened with no query string at all still land
-  // in the same place, which is convenient for manual testing.
-  const roomId = new URLSearchParams(location.search).get('room') || 'demo-room';
+  // in the same place, which is convenient for manual testing. In real
+  // use, this is a task's own id (see tutor.js's showShareBlock) - one
+  // task, one room.
+  const params = new URLSearchParams(location.search);
+  const roomId = params.get('room') || 'demo-room';
+  // Only present on the link the tutor opens for themselves (see
+  // tutor.js) - its presence is what shows the Reset/End controls. The
+  // server independently re-checks this token is genuinely valid before
+  // honouring a reset/end request, so a made-up token here just means the
+  // controls show but don't actually do anything - see party/server.js's
+  // verifyTutor.
+  const tutorToken = params.get('token') || null;
+  let isEnded = false;
 
   // --- Shared state ---
   //
@@ -184,6 +203,7 @@
   // browser never assumes its own move succeeded until the server
   // confirms it by broadcasting the new state.
   function requestMove(cardId, target) {
+    if (isEnded) return; // board is frozen once the host has ended the session
     dragDroppedCardId = null; // only the drag-release path sets this, see onPointerUp
     justMovedCardId = target !== 'pool' ? cardId : null;
     send({ type: 'move', cardId, target });
@@ -204,6 +224,7 @@
   }
 
   function handleActivateCard(cardId) {
+    if (isEnded) return;
     if (!pickedUpCardId) {
       pickedUpCardId = cardId;
       document.querySelectorAll('.card').forEach((el) => {
@@ -230,6 +251,7 @@
   }
 
   function handleActivateSlot(slotIndex) {
+    if (isEnded) return;
     if (!pickedUpCardId) {
       announce('Empty position. Pick up a card first, then choose a position to place it.');
       return;
@@ -295,6 +317,7 @@
   }
 
   function onPointerDown(e) {
+    if (isEnded) return;
     if (e.button !== undefined && e.button !== 0) return;
     const el = e.currentTarget;
     el.setPointerCapture(e.pointerId);
@@ -426,9 +449,72 @@
       cards = data.cards;
       slotAssignment = data.slotAssignment;
       pool = data.pool;
+      if (data.title && data.title.trim()) {
+        titleEl.textContent = data.title;
+      }
+      instructionsEl.textContent = data.instructions || '';
       render();
+
+      if (data.ended && !isEnded) {
+        isEnded = true;
+        endedBannerEl.hidden = false;
+        hostControlsEl.hidden = true; // nothing left to reset/end once it's over
+        releasePickup();
+        announce('The host has ended this session. The board is now read-only.');
+      }
+    } else if (data.type === 'presence') {
+      presenceEl.textContent = data.names.length
+        ? `${data.names.length} ${data.names.length === 1 ? 'person' : 'people'} here: ${data.names.join(', ')}`
+        : 'Waiting for others to join…';
     }
   }
+
+  // --- Joining with an optional display name ---
+  //
+  // Dragging/placing cards works immediately regardless of whether this
+  // form has been submitted yet - a name is purely for the presence list
+  // (so people can see who else is here), never a requirement to
+  // participate, same "optional, never a login" rule the rest of the app
+  // follows for students.
+  joinFormEl.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('join-name-input').value.trim();
+    send({ type: 'join', name });
+    joinFormEl.hidden = true;
+  });
+
+  // --- Host controls (only meaningful if a tutor token was in the URL -
+  // see tutor.js's showShareBlock for where that link comes from) ---
+
+  if (tutorToken) {
+    hostControlsEl.hidden = false;
+  }
+
+  resetBtn.addEventListener('click', () => {
+    send({ type: 'reset', token: tutorToken });
+  });
+
+  // End session is one-way and freezes the board for everyone, so it uses
+  // the same two-click arm/confirm pattern as tutor.js's delete button,
+  // rather than a native confirm() dialog (kept consistent with the rest
+  // of this app - see CLAUDE.md on why native dialogs were avoided).
+  let endArmed = false;
+  let endArmTimer = null;
+  endBtn.addEventListener('click', () => {
+    if (!endArmed) {
+      endArmed = true;
+      endBtn.textContent = 'Really end?';
+      endBtn.classList.add('danger');
+      endArmTimer = setTimeout(() => {
+        endArmed = false;
+        endBtn.textContent = 'End session';
+        endBtn.classList.remove('danger');
+      }, 4000);
+      return;
+    }
+    clearTimeout(endArmTimer);
+    send({ type: 'end', token: tutorToken });
+  });
 
   function connect() {
     // ws://127.0.0.1:1999 is PartyKit's local dev server address. Once

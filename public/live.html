@@ -37,11 +37,28 @@
     <aside class="info-panel">
       <h1 id="set-title">Diamond Nine — Live</h1>
       <p id="live-status" class="live-status">Connecting…</p>
-      <p id="set-instructions" class="instructions visually-hidden">
-        This board is shared live - everyone with this link sees the same cards move in
-        real time. Drag a card into the diamond, or click/tap it to pick it up, then
-        click/tap another card to swap or an empty position to place it.
-      </p>
+      <p id="set-instructions" class="instructions"></p>
+      <p id="presence-line" class="live-presence"></p>
+
+      <form id="join-name-form" class="join-name-form">
+        <label class="field">
+          <span>Your name <span class="muted">(optional, shown to others here)</span></span>
+          <input type="text" id="join-name-input" maxlength="200" autocomplete="name" />
+        </label>
+        <button type="submit">Join</button>
+      </form>
+
+      <div id="host-controls" class="host-controls" hidden>
+        <p class="muted host-controls-label">Host controls</p>
+        <div class="host-controls-actions">
+          <button type="button" id="reset-board-btn" class="secondary">Reset board</button>
+          <button type="button" id="end-session-btn" class="secondary">End session</button>
+        </div>
+      </div>
+
+      <div id="ended-banner" class="ended-banner" hidden>
+        <p><strong>Session ended.</strong> Thanks everyone — the final arrangement has been saved.</p>
+      </div>
     </aside>
   </div>
 
