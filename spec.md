@@ -81,24 +81,27 @@ narrow row gutter — not a rigid grid with empty placeholder cells.
 
 - Analytics/reporting beyond viewing one student's result at a time
 - Images on cards at all (dropped entirely, see Tutor-side features above)
-- Live collaborative mode (see its own section below) — a real future phase, not something to fold into the current async model incidentally
+- Live collaborative mode (see its own section below) — in progress on the `live-collaborative-mode` branch, not folded into the async model above
 
-## Live collaborative mode (scoped future phase, not current v1)
+## Live collaborative mode (in progress — see `live-collaborative-mode` branch)
 
 Small groups are a common real session shape, and the pedagogical value of a
 diamond nine (disagreement in the middle row) depends on students seeing and
 reacting to each other live — which for a remote tutor means real-time sync,
-not just async solo submissions. This is a genuine future phase, deliberately
-scoped small enough to actually finish rather than open-ended "multiplayer":
+not just async solo submissions. This is deliberately scoped small enough to
+actually finish rather than open-ended "multiplayer".
+
+### Decided
 
 - **Shared state, not personal state.** The same board model that exists
   today (slot assignment + pool) held server-side per session and broadcast
   to everyone connected, instead of living only in one browser.
 - **Last-write-wins, full stop.** No operational-transform/CRDT merge logic.
-  Two people move at once, the later timestamp wins. For a low-stakes card
-  sort, "someone else already moved it" is a shrug, not a data-loss
-  incident — this alone removes the single biggest source of real
-  multiplayer complexity.
+  Two people move at once, the later message received wins. This falls out
+  for free from the chosen transport (see below): a room processes incoming
+  messages one at a time, in arrival order, so there's no real concurrency
+  to coordinate — the second move simply overwrites the first in the room's
+  in-memory state, no special-case code needed.
 - **Presence is a name list, not live cursors/avatars.** Highest visual
   payoff, lowest functional necessity, meaningful extra work — cut from v1.
 - **Tutor moderation is two controls**: Reset board, End session (freeze the
@@ -106,21 +109,89 @@ scoped small enough to actually finish rather than open-ended "multiplayer":
 - **Reconnection just refetches current state.** No resumable session state
   machine — a dropped student rejoins and sees wherever the board currently
   is.
-- **Transport: a managed realtime service** (e.g. Cloudflare Durable
-  Objects / PartyKit, or Supabase Realtime/Ably as alternatives) rather than
-  a hand-rolled WebSocket server with custom reconnection/heartbeat/presence
-  logic — the service absorbs connection lifecycle; app code is just "on
-  message, update shared state, broadcast." Cost at this scale is
-  effectively $0–10/month, not a real budget line.
+- **Transport: PartyKit** (2026-10-06 decision), not a hand-rolled WebSocket
+  server. Rejected a raw hand-rolled WebSocket server because it would mean
+  building, ourselves, several things that have nothing to do with this
+  app's actual feature: reconnect/retry logic for every dropped connection,
+  a way for multiple server processes to pass messages to each other
+  (needed the moment there's more than one server instance for
+  reliability), and the deploy/scaling complexity of a stateful server
+  instead of a normal stateless one. PartyKit runs on Cloudflare's Durable
+  Objects infrastructure (Cloudflare acquired PartyKit in 2024, so this
+  isn't two competing backends, it's one engine with a friendlier API) and
+  absorbs all of that: app code is just "on message, update shared state,
+  broadcast." Chose PartyKit's own free tier over using Cloudflare Workers
+  directly, since Durable Objects require Cloudflare's $5/month Workers
+  Paid plan with no free option — PartyKit avoids that recurring cost while
+  validating the feature. Revisit direct Durable Objects only if PartyKit's
+  free tier is ever actually outgrown; migrating later is a smaller step
+  than it looks, since it's the same underlying platform.
+- **A live session is started from an existing task, not a new concept.**
+  The tutor's dashboard/editor gets a "Start live session" action on a
+  saved task. This mints a short-lived PartyKit room, seeded once from that
+  task's existing title/instructions/cards (fetched from the normal
+  `/api/sets/:id` endpoint — the room does not get its own copy of the
+  SQLite data model). The tutor is given a separate shareable *live* link
+  (distinct from the existing async student link) that points students at
+  that specific room.
+- **Student join flow**: open the live link → optional display name prompt
+  (same pattern as the existing post-submit name field) → connects to the
+  room → receives the current shared state → can drag cards, with every
+  move broadcast to the room and reflected on everyone else's screen.
+- **End-of-session persistence**: ending a live session writes exactly
+  *one* row to the existing `results` table — there is one shared final
+  arrangement, not one per student, since the whole point is that it was
+  built together. `student_name` holds a comma-joined list of whoever was
+  present (or a generic "Live group session" label if nobody gave a name),
+  reusing the existing results schema rather than adding a new table for
+  this. Flagged here as the simplest option, open to revisiting once this
+  is actually in front of a tutor.
 - **Test with simulated concurrent clients before real students ever see
   it**: multiple headless browser contexts driving simultaneous
   interactions (same card grabbed at once, drop-at-the-same-instant, a
-  dropped connection mid-drag) against the real backend, asserting the
-  board always converges to a sane state. This is the actual defense
+  dropped connection mid-drag) against the real PartyKit room, asserting
+  the board always converges to a sane state. This is the actual defense
   against live bugs, not hoping it doesn't happen.
-- Explicitly still excluded even from this scoped version: live cursors,
-  per-card "who's dragging this" indicators, granular per-card locking,
-  session replay/history, and scaling past a handful of concurrent rooms.
+
+### Explicitly excluded, even from this scoped version
+
+- Live cursors or per-card "who's dragging this" indicators. (Discussed
+  2026-10-06: this needs broadcasting in-progress drag position at a
+  continuous rate, not just final drop position, plus a rule for who wins
+  when two people grab the same card at once, plus new "ghost card"
+  rendering for everyone else's in-progress drags. Real, but a clearly
+  separable later step once plain final-position sync is solid — not part
+  of this build.)
+- Granular per-card locking, session replay/history, and scaling past a
+  handful of concurrent rooms.
+
+### Build order (staged, each stage a working checkpoint)
+
+1. **Prove the plumbing**: a throwaway two-browser-tab demo (e.g. a shared
+   counter) through PartyKit, nothing diamond-nine-specific yet — confirms
+   the account/deploy setup actually works before any real app code depends on it.
+2. **Plain state sync (the real MVP)**: wire the existing slotAssignment +
+   pool model through a PartyKit room. A move only broadcasts once a card
+   is *dropped* — no in-progress drag streaming yet (see exclusions above).
+3. **Tutor controls + presence**: Start/Reset/End session, and the joined
+   name list.
+4. **Concurrency test pass**: the simulated-concurrent-clients test
+   described above, before this is considered done.
+
+### New moving parts this introduces (be aware of, not blockers)
+
+- **A second deployed service.** PartyKit code lives separately from
+  `server.js` (its own folder, its own `partykit.json`, deployed with
+  `npx partykit deploy` to Cloudflare's edge) and runs independently of
+  wherever the existing Express app is hosted. The browser talks to *both*:
+  the existing Express API for task data, and the PartyKit room for live sync.
+- **A PartyKit account tied to Cloudflare**, needed before any of this can
+  be deployed (local dev can run without it, but shipping it live can't).
+  This is the one step in this feature that's the user's to do, not
+  something done from within a coding session.
+- **Client library**: PartyKit's `partysocket` client, loaded the same
+  dependency-light way everything else in this app is (a CDN `<script
+  type="module">` import, no build step/bundler introduced).
 
 ## Tech shape
 

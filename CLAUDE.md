@@ -35,3 +35,12 @@ A simple web app for online tutors to run a diamond nine card sort task with stu
   - Students never get accounts. An optional display name (already
     supported server-side via `student_name` on results) is the only
     identity - no login, ever, for students.
+- Tutor accounts/dashboard/task CRUD/results milestone above: shipped and
+  merged to master (2026-10-06).
+- Live-collaborative mode (2026-10-06): now being built on the
+  `live-collaborative-mode` branch, with PartyKit chosen as the realtime
+  transport (runs on Cloudflare's Durable Objects infrastructure; picked
+  for PartyKit's own free tier over paying Cloudflare's $5/month Workers
+  plan directly). Full spec, staged build plan, and what's explicitly
+  excluded are in spec.md's "Live collaborative mode" section - read that
+  before touching this feature, it's a real design, not a placeholder.
