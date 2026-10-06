@@ -1,5 +1,8 @@
-// STAGE 3: real task data, presence, and tutor moderation (Reset/End).
-// See spec.md's "Live collaborative mode" section for the full design.
+// STAGE 3 + the "visible live dragging" stretch goal: real task data,
+// presence, tutor moderation (Reset/End), and relaying in-progress drag
+// positions so everyone can see a card moving before it's dropped, not
+// just after. See spec.md's "Live collaborative mode" section for the
+// full design of both.
 //
 // A live session's room id is just the task's own id (see tutor.js's
 // showShareBlock) - one task, one room, kept simple rather than minting
@@ -52,6 +55,15 @@ export default class Server {
     // happens once, at End session, as a single row in the real results
     // table (see endSession()).
     this.presentNames = new Map();
+    // cardId -> the connection id currently dragging it. This is a soft
+    // claim, not a real lock: it only drives a dimmed visual on everyone
+    // else's screen (see live.js), never blocks a move from actually
+    // happening. A real lock would risk a card stuck permanently claimed
+    // by a connection that dropped mid-drag (no matching drag-end ever
+    // arrives) - correctness still comes entirely from handleMove()'s
+    // existing last-write-wins behaviour regardless of who's "claimed"
+    // what, so there's nothing for a hard lock to actually protect.
+    this.draggedBy = new Map();
     // Loaded lazily on the first connection rather than in the
     // constructor, because loading real task data is asynchronous (an
     // HTTP call) and a constructor can't be awaited.
@@ -114,6 +126,17 @@ export default class Server {
     if (this.presentNames.delete(connection.id)) {
       this.room.broadcast(JSON.stringify(this.presenceMessage()));
     }
+    // If this connection dropped mid-drag (exactly Stage 4's Scenario C,
+    // but for a drag instead of a completed move), nobody will ever send
+    // the matching drag-end - release its claims now and tell everyone
+    // else to drop the ghost/dimmed state, rather than leaving a card
+    // looking permanently claimed by someone who's already gone.
+    for (const [cardId, draggerId] of this.draggedBy) {
+      if (draggerId === connection.id) {
+        this.draggedBy.delete(cardId);
+        this.room.broadcast(JSON.stringify({ type: 'drag-end', cardId }));
+      }
+    }
   }
 
   async onMessage(message, sender) {
@@ -127,7 +150,45 @@ export default class Server {
       if (await this.verifyTutor(data.token)) this.resetBoard();
     } else if (data.type === 'end') {
       if (await this.verifyTutor(data.token)) await this.endSession();
+    } else if (data.type === 'drag-start') {
+      this.handleDragStart(data.cardId, sender);
+    } else if (data.type === 'drag-move') {
+      this.handleDragMove(data.cardId, data.xPct, data.yPct, sender);
+    } else if (data.type === 'drag-end') {
+      this.handleDragEnd(data.cardId, sender);
     }
+  }
+
+  // These three are pure relays - this server never validates or stores
+  // drag positions as part of the real board state (this.slotAssignment/
+  // this.pool are untouched by any of them). They exist purely so other
+  // browsers can draw a ghost card; the authoritative move still only
+  // ever happens through the existing 'move' message and handleMove().
+  handleDragStart(cardId, sender) {
+    if (this.ended) return;
+    this.draggedBy.set(cardId, sender.id);
+    const name = this.presentNames.get(sender.id) || '';
+    // Excludes the sender ([sender.id]) - you don't need to see your own
+    // ghost, you can already see the real card following your own cursor.
+    this.room.broadcast(JSON.stringify({ type: 'drag-start', cardId, name }), [sender.id]);
+  }
+
+  handleDragMove(cardId, xPct, yPct, sender) {
+    if (this.ended) return;
+    this.room.broadcast(
+      JSON.stringify({ type: 'drag-move', cardId, xPct, yPct }),
+      [sender.id]
+    );
+  }
+
+  handleDragEnd(cardId, sender) {
+    // Only clear the claim if it actually still belongs to this sender -
+    // otherwise a stray late drag-end from a previous drag could cancel
+    // someone else's claim on the same card.
+    if (this.draggedBy.get(cardId) === sender.id) {
+      this.draggedBy.delete(cardId);
+    }
+    this.room.broadcast(JSON.stringify({ type: 'drag-end', cardId }), [sender.id]);
   }
 
   // Asks the real Express app whether this token actually belongs to a

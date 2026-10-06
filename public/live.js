@@ -62,6 +62,16 @@
   let justMovedCardId = null;
   let dragDroppedCardId = null;
 
+  // --- Visible live dragging (stretch goal) ---
+  //
+  // cardId -> the name of whoever (someone else) is currently dragging
+  // it, purely so the real card can show a dimmed "someone else has this"
+  // state - never blocks this user from grabbing it anyway (see
+  // spec.md: a soft claim, not a lock).
+  const remoteClaims = new Map();
+  // cardId -> the ghost <div> currently following a remote drag.
+  const remoteGhosts = new Map();
+
   function cardById(id) {
     return cards.find((c) => c.id === id);
   }
@@ -110,6 +120,7 @@
     el.appendChild(textEl);
     if (card.id === pickedUpCardId) el.classList.add('picked-up');
     if (card.text.length >= 23) el.classList.add('long-text');
+    if (remoteClaims.has(card.id)) el.classList.add('remote-claimed');
 
     let suppressNextEnter = card.id === justMovedCardId;
     el.addEventListener('mouseenter', () => {
@@ -339,6 +350,7 @@
     dragState.dragging = true;
     dragState.offsetX = e.clientX - rect.left;
     dragState.offsetY = e.clientY - rect.top;
+    dragState.lastDragMoveSent = 0;
     el.classList.add('dragging');
     el.style.position = 'fixed';
     el.style.left = `${rect.left}px`;
@@ -346,6 +358,29 @@
     el.style.width = `${rect.width}px`;
     el.style.height = `${rect.height}px`;
     el.style.zIndex = '60';
+    send({ type: 'drag-start', cardId: dragState.cardId });
+  }
+
+  // Converts a pixel position into a percentage of .layout's own bounding
+  // box, and back again. Raw pixels aren't meaningful across different
+  // browsers/screens - someone's cursor at x=900 on a 1920px-wide monitor
+  // is nowhere near x=900 on a 1366px laptop. Percentages of the same
+  // reference element are what let a position mean the same *visual* spot
+  // regardless of window size. See spec.md's stretch-goal section.
+  function toLayoutPct(leftPx, topPx) {
+    const layoutRect = document.querySelector('.layout').getBoundingClientRect();
+    return {
+      xPct: (leftPx - layoutRect.left) / layoutRect.width,
+      yPct: (topPx - layoutRect.top) / layoutRect.height,
+    };
+  }
+
+  function fromLayoutPct(xPct, yPct) {
+    const layoutRect = document.querySelector('.layout').getBoundingClientRect();
+    return {
+      leftPx: layoutRect.left + xPct * layoutRect.width,
+      topPx: layoutRect.top + yPct * layoutRect.height,
+    };
   }
 
   function onPointerMove(e) {
@@ -356,8 +391,21 @@
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
       beginDrag(e);
     }
-    dragState.el.style.left = `${e.clientX - dragState.offsetX}px`;
-    dragState.el.style.top = `${e.clientY - dragState.offsetY}px`;
+    const leftPx = e.clientX - dragState.offsetX;
+    const topPx = e.clientY - dragState.offsetY;
+    dragState.el.style.left = `${leftPx}px`;
+    dragState.el.style.top = `${topPx}px`;
+
+    // Throttled to ~20 times a second - raw pointermove can fire well
+    // past 60/sec, and broadcasting every single one (times however many
+    // people are dragging at once) is wasted room traffic for motion
+    // nobody could perceive the difference in anyway.
+    const now = performance.now();
+    if (now - dragState.lastDragMoveSent >= 50) {
+      dragState.lastDragMoveSent = now;
+      const { xPct, yPct } = toLayoutPct(leftPx, topPx);
+      send({ type: 'drag-move', cardId: dragState.cardId, xPct, yPct });
+    }
 
     document.querySelectorAll('.drop-target').forEach((n) => n.classList.remove('drop-target'));
     const dropZone = findDropZone(e.clientX, e.clientY);
@@ -377,6 +425,13 @@
       handleActivateCard(cardId);
       return;
     }
+
+    // Sent on every drag release, whether or not it produced a real move
+    // (e.g. dropped off-board) - this is what tells everyone else to
+    // remove the ghost. A 'move' message (and the 'state' broadcast that
+    // follows it) only happens on a *successful* drop, so relying on that
+    // alone would leave a stale ghost on-screen forever after an invalid one.
+    send({ type: 'drag-end', cardId });
 
     const dropZone = findDropZone(e.clientX, e.clientY);
     el.classList.remove('dragging');
@@ -460,12 +515,62 @@
         endedBannerEl.hidden = false;
         hostControlsEl.hidden = true; // nothing left to reset/end once it's over
         releasePickup();
+        remoteGhosts.forEach((ghost) => ghost.remove());
+        remoteGhosts.clear();
+        remoteClaims.clear();
         announce('The host has ended this session. The board is now read-only.');
       }
     } else if (data.type === 'presence') {
       presenceEl.textContent = data.names.length
         ? `${data.names.length} ${data.names.length === 1 ? 'person' : 'people'} here: ${data.names.join(', ')}`
         : 'Waiting for others to join…';
+    } else if (data.type === 'drag-start') {
+      remoteClaims.set(data.cardId, data.name || '');
+      const el = document.querySelector(`.card[data-card-id="${data.cardId}"]`);
+      if (el) el.classList.add('remote-claimed');
+    } else if (data.type === 'drag-move') {
+      showGhost(data.cardId, data.xPct, data.yPct);
+    } else if (data.type === 'drag-end') {
+      remoteClaims.delete(data.cardId);
+      const el = document.querySelector(`.card[data-card-id="${data.cardId}"]`);
+      if (el) el.classList.remove('remote-claimed');
+      removeGhost(data.cardId);
+    }
+  }
+
+  // Creates (on first move) or repositions (on every move after) the
+  // ghost card for someone else's in-progress drag. This never touches
+  // the real card element or the real board state - it's a purely
+  // additive overlay, which is what keeps this stretch goal from having
+  // to change anything about how the already-tested board sync works.
+  function showGhost(cardId, xPct, yPct) {
+    let ghost = remoteGhosts.get(cardId);
+    if (!ghost) {
+      const card = cardById(cardId);
+      if (!card) return; // state for this card hasn't loaded yet - ignore until it has
+      ghost = document.createElement('div');
+      ghost.className = `card card-${cardColor(cardId)} ghost-card`;
+      const textEl = document.createElement('span');
+      textEl.className = 'card-text';
+      textEl.textContent = card.text;
+      ghost.appendChild(textEl);
+      const nameTag = document.createElement('span');
+      nameTag.className = 'ghost-name-tag';
+      nameTag.textContent = remoteClaims.get(cardId) || 'Someone';
+      ghost.appendChild(nameTag);
+      document.body.appendChild(ghost);
+      remoteGhosts.set(cardId, ghost);
+    }
+    const { leftPx, topPx } = fromLayoutPct(xPct, yPct);
+    ghost.style.left = `${leftPx}px`;
+    ghost.style.top = `${topPx}px`;
+  }
+
+  function removeGhost(cardId) {
+    const ghost = remoteGhosts.get(cardId);
+    if (ghost) {
+      ghost.remove();
+      remoteGhosts.delete(cardId);
     }
   }
 
@@ -526,6 +631,14 @@
     ws.addEventListener('open', () => setStatus(true));
     ws.addEventListener('close', () => {
       setStatus(false);
+      // Our own connection just dropped - any ghosts/claims we were
+      // tracking came from the room we just lost touch with, and will be
+      // re-sent fresh (or not, if those drags already ended) once we're
+      // back. Clear them now rather than risk a stale ghost stuck on
+      // screen through a reconnect.
+      remoteGhosts.forEach((ghost) => ghost.remove());
+      remoteGhosts.clear();
+      remoteClaims.clear();
       setTimeout(connect, 1000); // simple fixed-delay reconnect attempt
     });
     ws.addEventListener('message', handleServerMessage);

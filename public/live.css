@@ -86,3 +86,48 @@
   padding: 0.8rem 1rem;
   font-size: 0.9rem;
 }
+
+/* --- Visible live dragging (stretch goal) --- */
+
+/* The real card, shown dimmed on everyone else's screen while someone
+   has it mid-drag - a soft "heads up" signal, not a lock (you can still
+   grab it yourself; see spec.md on why a hard lock would be worse). */
+.card.remote-claimed {
+  opacity: 0.45;
+}
+
+/* The ghost: a floating copy that follows a remote drag. Positioned with
+   left/top set in JS (see live.js's showGhost) - position:fixed here
+   just establishes that it's taken out of normal layout, same technique
+   the real dragged card already uses locally. */
+.ghost-card {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 12rem;
+  opacity: 0.65;
+  outline: 2px dashed rgba(255, 255, 255, 0.8);
+  outline-offset: -4px;
+  pointer-events: none; /* never intercepts clicks/drags meant for the real board underneath it */
+  z-index: 70; /* above a locally-dragged card (z-index 60) so it's never hidden behind your own drag */
+  transition: none; /* no easing - it should track the remote cursor exactly, not lag behind it */
+  /* The base .card rule sets overflow:hidden (for clamping long text) -
+     override it here, since .ghost-name-tag is deliberately positioned
+     just outside the ghost's own box (bottom: -1.4rem) and would
+     otherwise be silently clipped away by that inherited overflow. */
+  overflow: visible;
+}
+
+.ghost-name-tag {
+  position: absolute;
+  bottom: -1.4rem;
+  left: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fff;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.3rem;
+  box-shadow: 0 2px 6px rgba(34, 38, 43, 0.15);
+  white-space: nowrap;
+}

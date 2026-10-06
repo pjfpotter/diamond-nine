@@ -245,7 +245,7 @@ actually finish rather than open-ended "multiplayer".
   dependency-light way everything else in this app is (a CDN `<script
   type="module">` import, no build step/bundler introduced).
 
-### Stretch goal: visible live dragging (2026-10-06, not started)
+### Stretch goal: visible live dragging (2026-10-06, ✅ built)
 
 Everything above only ever shows a card's *final* position once it's
 dropped — exactly what was built and tested in Stages 1-4. This section
@@ -345,6 +345,28 @@ Still excluded even if this is built: granular per-card locking that
 actually prevents a second grab (rejected above, for the dropped-
 connection reason given), session replay/history of drag movements, and
 anything beyond a handful of concurrent rooms.
+
+**Built as specced**, with two things worth recording:
+- The percentage-coordinate design worked exactly as intended once
+  verified correctly - an early test comparing raw pixel positions across
+  two tabs showed a ~20-35px mismatch, which looked like a real bug but
+  turned out to be a *test* artifact: Playwright's multi-step mouse
+  interpolation fires several synthetic positions within a few
+  milliseconds, faster than the 50ms throttle window, so only an
+  early interpolated point (not the true final one) was getting sent. A
+  single, non-interpolated final move confirmed an exact pixel match
+  between the sender's real position and the receiver's ghost - the
+  coordinate math itself was correct all along.
+- A real bug *was* found this way too: the ghost's name tag was
+  invisible, clipped by the base `.card` rule's `overflow: hidden`
+  (meant for clamping long card text) because the tag is deliberately
+  positioned just outside the ghost's own box. Fixed with an
+  `overflow: visible` override on `.ghost-card` specifically.
+- Verified end to end: a remote drag dims the real card and shows a
+  tracking ghost with the dragger's name; the ghost disappears and the
+  dimming clears on a successful drop, an invalid (off-board) drop, and
+  an abrupt mid-drag disconnect; Stage 3 (reset/end) and Stage 4
+  (concurrency) were re-run afterward and still pass unchanged.
 
 ## Tech shape
 
