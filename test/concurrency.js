@@ -8,7 +8,7 @@
 //
 // This talks to the REAL backend, not a mock of it: the real Express app
 // (for creating a task and checking the saved result afterwards) and the
-// real PartyKit dev server (for the actual room/concurrency behaviour).
+// real `wrangler dev` Worker (for the actual room/concurrency behaviour).
 // Both must already be running - see the instructions printed if they're
 // not reachable.
 //
@@ -16,7 +16,7 @@
 // Node 22) - no new dependency added to the project just to run this.
 
 const EXPRESS_BASE = 'http://localhost:3000';
-const PARTYKIT_BASE = 'ws://127.0.0.1:1999';
+const WORKER_BASE = 'ws://127.0.0.1:8787';
 
 function fail(message) {
   console.error(`✗ FAIL: ${message}`);
@@ -33,7 +33,7 @@ function ok(message) {
 // "several students' browsers" in this test.
 function connectClient(roomId) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${PARTYKIT_BASE}/party/${encodeURIComponent(roomId)}`);
+    const ws = new WebSocket(`${WORKER_BASE}/party/${encodeURIComponent(roomId)}`);
     const client = { ws, latestState: null };
     ws.addEventListener('message', (event) => {
       const data = JSON.parse(event.data);
@@ -85,7 +85,7 @@ function checkInvariant(state, allCardIds, label) {
 
 async function main() {
   console.log('Concurrency test - requires both servers already running:');
-  console.log('  npx partykit dev   (in one terminal)');
+  console.log('  npx wrangler dev   (in one terminal)');
   console.log('  npm start          (in another)');
   console.log('');
 
@@ -114,8 +114,8 @@ async function main() {
   try {
     clients = await Promise.all(Array.from({ length: 6 }, () => connectClient(taskId)));
   } catch (err) {
-    console.error('Could not reach PartyKit at', PARTYKIT_BASE);
-    console.error('Make sure `npx partykit dev` is running, then try again.');
+    console.error('Could not reach the Worker at', WORKER_BASE);
+    console.error('Make sure `npx wrangler dev` is running, then try again.');
     process.exit(1);
   }
   // Wait for everyone's initial state to land before starting.

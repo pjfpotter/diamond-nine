@@ -244,18 +244,67 @@ actually finish rather than open-ended "multiplayer".
 
 ### New moving parts this introduces (be aware of, not blockers)
 
-- **A second deployed service.** PartyKit code lives separately from
-  `server.js` (its own folder, its own `partykit.json`, deployed with
-  `npx partykit deploy` to Cloudflare's edge) and runs independently of
+- **A second deployed service.** The live-sync server lives separately from
+  `server.js` (its own `worker/` folder, its own `wrangler.jsonc`, deployed
+  with `npx wrangler deploy` to Cloudflare's edge) and runs independently of
   wherever the existing Express app is hosted. The browser talks to *both*:
-  the existing Express API for task data, and the PartyKit room for live sync.
-- **A PartyKit account tied to Cloudflare**, needed before any of this can
-  be deployed (local dev can run without it, but shipping it live can't).
-  This is the one step in this feature that's the user's to do, not
-  something done from within a coding session.
-- **Client library**: PartyKit's `partysocket` client, loaded the same
-  dependency-light way everything else in this app is (a CDN `<script
-  type="module">` import, no build step/bundler introduced).
+  the existing Express API for task data, and the Worker/Durable Object room
+  for live sync.
+- **A Cloudflare account on the $5/month Workers Paid plan**, needed before
+  any of this can be deployed (local dev can run without it, but shipping it
+  live can't) — Durable Objects have no free tier. This is the one step in
+  this feature that's the user's to do, not something done from within a
+  coding session.
+
+### Transport migration: PartyKit → raw Cloudflare Workers (2026-10-06)
+
+Deploying to a fresh Cloudflare account failed: `npx partykit deploy` errored
+with "Creating new key-value backed Durable Object namespaces is no longer
+supported on this account. Please create a namespace using a
+`new_sqlite_classes` migration instead." Cloudflare changed policy
+2026-07-09 to require SQLite-backed storage for any *new* Durable Object
+namespace. Confirmed via the published npm package that `partykit@0.0.115`
+(the latest version that exists) was published 2025-05-21 — over a year
+before that policy change — and a direct check of its bundled CLI code found
+zero support for `new_sqlite_classes` anywhere. This isn't a config problem
+or something a newer PartyKit version would fix, because no newer version
+exists: deploying through PartyKit's CLI to any Cloudflare account created
+(or Durable-Object-namespace-reset) after 2026-07-09 is a dead end.
+
+PartyKit was never a separate backend from Cloudflare — it's a thin
+convenience wrapper that was always deploying this same code to Workers +
+Durable Objects underneath. So the fix is to stop going through that
+now-broken wrapper and deploy directly with `wrangler` (Cloudflare's own,
+actively maintained CLI, which does support `new_sqlite_classes`) instead.
+Nothing about where this runs, what it costs, or the game logic itself
+changes — only the authoring/deploy layer on top of it.
+
+What moved:
+- `party/server.js` (PartyKit's `Party.Server` shape) → `worker/index.js`
+  (a Worker `fetch()` handler that routes `/party/:roomId` to a same-named
+  `Room` Durable Object, plus the `Room` class itself using Cloudflare's
+  native WebSocket API). All game logic — last-write-wins moves, presence,
+  reset/end, drag-position relay, the rate limit and connection cap — is
+  unchanged line-for-line in substance; only the lifecycle names changed
+  (`onConnect`/`onMessage`/`onClose` → `fetch()`+event listeners,
+  `room.broadcast`/`room.getConnections` → manual iteration over tracked
+  sessions). Not using the Hibernation API (`acceptWebSocket`) — this keeps
+  the port simple (plain in-memory state, nothing to serialize) and a
+  classroom-scale, hour-long session gets no real benefit from hibernation's
+  billing optimization.
+- `partykit.json` → `wrangler.jsonc`, with an explicit `new_sqlite_classes`
+  migration for the `Room` class.
+- `partykit` devDependency → `wrangler`. No PartyKit code or client library
+  (`partysocket`) remains anywhere in the project.
+- Local dev address changed from PartyKit's `ws://127.0.0.1:1999` to
+  `wrangler dev`'s default `ws://127.0.0.1:8787`, updated in both
+  `public/live.js` and `test/concurrency.js`. The `/party/:roomId` URL path
+  itself was kept identical on purpose, to minimize the blast radius of this
+  change to just host/port.
+- `public/live.js` picks its live-server host by hostname (localhost →
+  `127.0.0.1:8787`; anything else → the deployed Worker's `*.workers.dev`
+  URL) — the production host is a placeholder until the first real
+  `wrangler deploy` gives us the actual subdomain to fill in.
 
 ### Stretch goal: visible live dragging (2026-10-06, ✅ built)
 

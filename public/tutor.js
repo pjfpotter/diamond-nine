@@ -390,7 +390,7 @@
     document.getElementById('copy-share-link-btn').onclick = (e) => copyToClipboard(link, e.currentTarget);
     document.getElementById('view-results-link').href = `#/results/${id}`;
 
-    // The live session reuses the task's own id as its PartyKit room id -
+    // The live session reuses the task's own id as its live-room id -
     // one task, one room, kept simple rather than minting a separate id
     // per session. The host link carries the tutor's token so the live
     // page knows to show Reset/End controls; the student link carries no

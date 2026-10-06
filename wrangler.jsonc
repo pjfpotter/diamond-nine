@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "diamond-nine-live",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-06",
+  "vars": {
+    // Which Express app this Worker talks to for task data, tutor-token
+    // checks, and saving results. Overridden at deploy time with
+    // `--var API_BASE=https://your-render-url.onrender.com` so the exact
+    // same committed code talks to localhost for `wrangler dev` and to the
+    // real deployed app in production.
+    "API_BASE": "http://localhost:3000"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" }
+    ]
+  },
+  "migrations": [
+    // SQLite-backed storage - required for any Durable Object namespace
+    // created after Cloudflare's 2026-07-09 policy change. See
+    // worker/index.js's header comment for why this project moved off
+    // PartyKit's CLI to get this.
+    { "tag": "v1", "new_sqlite_classes": ["Room"] }
+  ]
+}

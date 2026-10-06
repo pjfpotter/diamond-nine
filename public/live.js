@@ -621,13 +621,17 @@
     send({ type: 'end', token: tutorToken });
   });
 
+  // ws://127.0.0.1:8787 is `wrangler dev`'s local address for this
+  // project's Worker. In production this points at the deployed Worker
+  // instead - selected by hostname so the same committed code works in
+  // both places without an env file the static frontend could read.
+  const LIVE_SERVER_HOST = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    ? '127.0.0.1:8787'
+    : 'diamond-nine-live.YOUR-SUBDOMAIN.workers.dev';
+  const LIVE_SERVER_PROTOCOL = location.protocol === 'https:' ? 'wss:' : 'ws:';
+
   function connect() {
-    // ws://127.0.0.1:1999 is PartyKit's local dev server address. Once
-    // this is deployed for real (see spec.md's build order, a later
-    // stage), this will need to point at the deployed PartyKit URL
-    // instead - that's a small, deliberate change to make later, not
-    // something to solve before the sync logic itself is proven.
-    ws = new WebSocket(`ws://127.0.0.1:1999/party/${encodeURIComponent(roomId)}`);
+    ws = new WebSocket(`${LIVE_SERVER_PROTOCOL}//${LIVE_SERVER_HOST}/party/${encodeURIComponent(roomId)}`);
     ws.addEventListener('open', () => setStatus(true));
     ws.addEventListener('close', () => {
       setStatus(false);

@@ -1,9 +1,0 @@
-{
-  "$schema": "https://www.partykit.io/schema.json",
-  "name": "diamond-nine-live",
-  "main": "party/server.js",
-  "compatibilityDate": "2026-10-06",
-  "vars": {
-    "API_BASE": "http://localhost:3000"
-  }
-}
