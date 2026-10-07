@@ -53,6 +53,36 @@ db.exec(`
 // table per card would be more "correct" in theory but pure overhead here.
 
 const app = express();
+
+// On a host like Render the server never sees a visitor's connection
+// directly - every request arrives via the host's proxies, so without this
+// req.ip would be the *proxy's* address for everyone, and the per-IP rate
+// limiter below would treat all visitors as one person sharing one limit.
+// 'trust proxy' tells Express how many proxies sit in front of it, so it
+// can read the real visitor address out of the X-Forwarded-For header
+// those proxies add. It has to be an exact count, not just "true": each
+// proxy appends to that header, but a visitor can also send a made-up one
+// of their own, and trusting more entries than there are real proxies
+// would let them fake their IP and dodge the limit. Set per deployment via
+// an environment variable; left unset (locally) nothing is trusted, which
+// is correct when there's no proxy at all.
+const TRUST_PROXY_HOPS = Number.parseInt(process.env.TRUST_PROXY_HOPS, 10) || 0;
+if (TRUST_PROXY_HOPS > 0) app.set('trust proxy', TRUST_PROXY_HOPS);
+
+// Logs, once per server start, how many addresses the first request's
+// X-Forwarded-For header carried - for a normal visit that number is the
+// right value for TRUST_PROXY_HOPS on this host. Only the count is logged,
+// not the addresses themselves.
+let loggedProxyHops = false;
+app.use((req, res, next) => {
+  if (!loggedProxyHops) {
+    loggedProxyHops = true;
+    const forwarded = req.header('X-Forwarded-For');
+    const hops = forwarded ? forwarded.split(',').length : 0;
+    console.log(`First request: X-Forwarded-For has ${hops} address(es); TRUST_PROXY_HOPS is ${TRUST_PROXY_HOPS}`);
+  }
+  next();
+});
 // Express "middleware" runs on every incoming request, in the order
 // they're registered, before it reaches a specific route handler below.
 app.use(express.json({ limit: '256kb' })); // parses JSON request bodies into req.body; rejects anything bigger than 256kb outright
