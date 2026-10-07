@@ -4,9 +4,11 @@ A card sort tool for online tutoring sessions. A tutor writes nine cards and a
 question; students drag the cards into a diamond (rows of 1-2-3-2-1), with the
 card they agree with most at the top and least at the bottom.
 
-[![Diamond Nine: nine cards sorted into a diamond from most agree to least agree. Click to download the 22-second video.](brag.jpg)](https://github.com/pjfpotter/diamond-nine/raw/master/brag.mp4)
 
-*Click the image to download a 22-second walkthrough video (2 MB).*
+
+https://github.com/user-attachments/assets/0d736ef0-a579-433a-9fad-702b6a84f0ff
+
+
 
 **Try it:** https://diamond-nine.onrender.com — create a tutor space, write
 nine cards, and share the link with students.
