@@ -254,6 +254,26 @@
     });
   }
 
+  // The ready-made task behind the editor's "Start from an example"
+  // button. Kept here in the frontend, not seeded into the database: it's
+  // just text to pre-fill a form with, so it needs no owner, no id, and
+  // nothing on the server.
+  const EXAMPLE_TASK = {
+    title: 'What makes a good friend?',
+    instructions: 'Put the quality you think matters most at the top and the one that matters least at the bottom. Be ready to explain your middle row.',
+    cards: [
+      'Honesty',
+      'Sense of humour',
+      'Loyalty',
+      'Kindness',
+      'Shared interests',
+      'Good listener',
+      'Reliable',
+      'Fun to be with',
+      'Popular',
+    ],
+  };
+
   // Renders the create/edit form. `existingId` is null for a brand new
   // task, or a task's id string when editing one that already exists -
   // most of this function's logic (loading existing data, wording) branches
@@ -302,6 +322,32 @@
     bindCharCount(document.getElementById('field-instructions'), document.getElementById('instructions-char-count'), 1000);
 
     let currentId = existingId || null;
+
+    // "Start from an example": fills the whole form with a ready-made task
+    // so a new tutor can see what a finished one looks like and edit from
+    // there. Only offered on a brand-new task - on an existing one it would
+    // just be a way to overwrite real work by accident. Nothing is saved
+    // until the tutor presses Save, same as if they'd typed it themselves.
+    if (!existingId) {
+      document.getElementById('example-row').hidden = false;
+      document.getElementById('use-example-btn').addEventListener('click', () => {
+        const titleEl = document.getElementById('field-title');
+        const instructionsEl = document.getElementById('field-instructions');
+        const allFields = [titleEl, instructionsEl, ...cardInputs.map((c) => c.text)];
+        // If they've already typed something, ask before replacing it.
+        const hasText = allFields.some((f) => f.value.trim() !== '');
+        if (hasText && !window.confirm('Replace what you have typed with the example?')) return;
+        titleEl.value = EXAMPLE_TASK.title;
+        instructionsEl.value = EXAMPLE_TASK.instructions;
+        EXAMPLE_TASK.cards.forEach((text, i) => {
+          cardInputs[i].text.value = text;
+        });
+        // Same reason as when loading an existing task below: setting
+        // .value doesn't fire 'input', so nudge each char counter by hand.
+        allFields.forEach((f) => f.dispatchEvent(new Event('input')));
+        titleEl.focus();
+      });
+    }
 
     if (existingId) {
       // Editing an existing task: fetch its current data and pre-fill the form.
@@ -372,6 +418,7 @@
         currentId = data.id;
         history.replaceState(null, '', `#/edit/${currentId}`);
         document.getElementById('editor-heading').textContent = 'Edit task';
+        document.getElementById('example-row').hidden = true; // it's a saved task now - same rule as opening an existing one
       }
       statusEl.textContent = 'Saved.';
       announce('Task saved.');
