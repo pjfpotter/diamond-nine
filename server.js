@@ -69,17 +69,20 @@ const app = express();
 const TRUST_PROXY_HOPS = Number.parseInt(process.env.TRUST_PROXY_HOPS, 10) || 0;
 if (TRUST_PROXY_HOPS > 0) app.set('trust proxy', TRUST_PROXY_HOPS);
 
-// Logs, once per server start, how many addresses the first request's
+// Logs, once per server start, how many addresses a request's
 // X-Forwarded-For header carried - for a normal visit that number is the
-// right value for TRUST_PROXY_HOPS on this host. Only the count is logged,
-// not the addresses themselves.
+// right value for TRUST_PROXY_HOPS on this host. Waits for the first
+// request that actually has the header: the host's own health checks
+// reach the server directly, without going through the proxies, so they
+// arrive first and carry none. Only the count is logged, not the
+// addresses themselves.
 let loggedProxyHops = false;
 app.use((req, res, next) => {
-  if (!loggedProxyHops) {
+  const forwarded = req.header('X-Forwarded-For');
+  if (!loggedProxyHops && forwarded) {
     loggedProxyHops = true;
-    const forwarded = req.header('X-Forwarded-For');
-    const hops = forwarded ? forwarded.split(',').length : 0;
-    console.log(`First request: X-Forwarded-For has ${hops} address(es); TRUST_PROXY_HOPS is ${TRUST_PROXY_HOPS}`);
+    const hops = forwarded.split(',').length;
+    console.log(`First proxied request: X-Forwarded-For has ${hops} address(es); TRUST_PROXY_HOPS is ${TRUST_PROXY_HOPS}`);
   }
   next();
 });
