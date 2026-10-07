@@ -4,3 +4,4 @@ diamond9.db-shm
 diamond9.db-wal
 *.log
 .wrangler/
+brag-output/
