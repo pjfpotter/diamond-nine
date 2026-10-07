@@ -38,9 +38,13 @@ A simple web app for online tutors to run a diamond nine card sort task with stu
 - Tutor accounts/dashboard/task CRUD/results milestone above: shipped and
   merged to master (2026-10-06).
 - Live-collaborative mode (2026-10-06): now being built on the
-  `live-collaborative-mode` branch, with PartyKit chosen as the realtime
-  transport (runs on Cloudflare's Durable Objects infrastructure; picked
-  for PartyKit's own free tier over paying Cloudflare's $5/month Workers
-  plan directly). Full spec, staged build plan, and what's explicitly
+  `live-collaborative-mode` branch, with raw Cloudflare Workers + Durable
+  Objects as the realtime transport (`worker/index.js`, deployed with
+  `wrangler` - see `wrangler.jsonc`). PartyKit was the original choice but
+  was replaced the same day: its CLI can't deploy to a new Cloudflare
+  account (no support for the `new_sqlite_classes` migration Cloudflare
+  now requires), and it was only ever a thin wrapper over the same
+  infrastructure. No PartyKit code remains - see spec.md's "Transport
+  migration" section. Full spec, staged build plan, and what's explicitly
   excluded are in spec.md's "Live collaborative mode" section - read that
   before touching this feature, it's a real design, not a placeholder.
