@@ -167,7 +167,11 @@ button {
   cursor: pointer;
 }
 
-.link-btn-inline:hover {
+/* Written as button...:hover:not(:disabled) rather than just
+   .link-btn-inline:hover so it outranks style.css's general
+   button:hover:not(:disabled) rule - otherwise that one wins and paints a
+   black background behind the link text on hover. */
+button.link-btn-inline:hover:not(:disabled) {
   background: none;
   color: var(--ink);
 }

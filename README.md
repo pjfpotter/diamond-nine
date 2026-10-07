@@ -48,8 +48,8 @@ elsewhere, `PORT` to change the port).
 
 When deploying behind a proxy (Render, for example), set `TRUST_PROXY_HOPS` to
 the number of proxies in front of the app so the per-visitor rate limits see
-real visitor addresses. The server logs the number to use on the first request that arrives through a proxy
-after each start.
+real visitor addresses. The server logs the number to use on the first request
+that arrives through a proxy after each start.
 
 Live sessions need a second process, the realtime Worker:
 
