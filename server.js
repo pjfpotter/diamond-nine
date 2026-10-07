@@ -109,7 +109,7 @@ app.use(express.static(path.join(__dirname, 'public'), { index: 'tutor.html' }))
 // *returns* a middleware function pre-configured with the windowMs/max you
 // pass it, so the same logic can be reused with different limits on
 // different routes (see its two call sites further down).
-function rateLimit({ windowMs, max }) {
+function rateLimit({ windowMs, max, message = 'too many requests, please slow down' }) {
   const hits = new Map(); // ip -> array of request timestamps
   return (req, res, next) => {
     const now = Date.now();
@@ -118,7 +118,7 @@ function rateLimit({ windowMs, max }) {
     // that IP has already hit the limit inside it.
     const recent = (hits.get(ip) || []).filter((t) => now - t < windowMs);
     if (recent.length >= max) {
-      return res.status(429).json({ error: 'too many requests, please slow down' });
+      return res.status(429).json({ error: message });
     }
     recent.push(now);
     hits.set(ip, recent);
@@ -224,7 +224,14 @@ function requireTutor(req, res, next) {
 
 // A tutor "logs in" by minting a capability token — no password, no account.
 // Whoever holds the token (bookmarked dashboard link) can manage its sets.
-app.post('/api/tutors', rateLimit({ windowMs: 60 * 60 * 1000, max: 20 }), (req, res) => {
+// Capped at two new spaces an hour per address: a tutor only ever needs one
+// (their dashboard link gets them back in), so this is a deliberately tight
+// limit on the one endpoint that creates a brand-new account for anybody.
+app.post('/api/tutors', rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 2,
+  message: 'Too many tutor spaces have been created from this network in the last hour. Please try again later, or use your saved dashboard link.',
+}), (req, res) => {
   const token = newId();
   db.prepare('INSERT INTO tutors (token) VALUES (?)').run(token);
   res.json({ token });
